@@ -13,4 +13,5 @@ out/
 .claude/hillclimb/**/report.html
 .claude/hillclimb/**/state.json
 .claude/hillclimb/**/*.md
+!.claude/hillclimb/**/change.md
 .claude/hillclimb/**/*.log

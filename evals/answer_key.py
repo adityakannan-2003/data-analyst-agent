@@ -70,6 +70,7 @@ def facts(csv_path: Path) -> dict[str, str]:
     f["matcha_launch"] = matcha["ts"].min().strftime("%-d %B %Y")
     monthly = matcha.groupby(matcha["ts"].dt.to_period("M"))["revenue"].sum()
     f["matcha_avg_on_sale"], f["matcha_avg_12"] = money(monthly.mean()), money(monthly.sum() / 12)
+    f["matcha_avg_on_sale_lo"], f["matcha_avg_on_sale_hi"] = money(monthly.mean() * 0.98), money(monthly.mean() * 1.02)
     # The two products either side of the Matcha Latte's months-on-sale average (both sold all year)
     by_product = df.groupby([df["ts"].dt.to_period("M"), "product"])["revenue"].sum().unstack()
     f["espresso_avg"], f["muffin_avg"] = money(by_product["Espresso"].mean()), money(by_product["Muffin"].mean())

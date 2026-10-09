@@ -110,6 +110,16 @@ Each question has checks with expected values that [evals/answer_key.py](evals/a
 
 **Baseline: all 17 questions pass on both runs** with `claude-opus-5-5` at high effort (95% interval: 82% to 100%). An answer costs about $0.05 and takes about 16 seconds. Every answer and grade is in [results.jsonl](.claude/hillclimb/analyst-answers/baseline/results.jsonl). With a perfect baseline, the eval's main use is catching regressions, for example when trying a cheaper model or lower effort.
 
+**Opus 5.5 vs. Sonnet 5.5**, with the same prompt, tools, effort and grader, 2 runs per question:
+
+| | Opus 5.5 | Sonnet 5.5 |
+|---|---|---|
+| Questions passed on both runs | 17 of 17 | 16 of 17 |
+| Cost per answer | $0.047 | $0.020 |
+| Time per answer | 16 s | 11 s |
+
+Sonnet costs 57% less and misses only the Matcha Latte average. In one run it averaged the Matcha over all 12 months without noting the March launch. In the other it noticed the launch but gave the wrong figure: $1,031 instead of $1,238. Opus got it right both times. Sonnet also graded its own answers here, so I re-graded them with Opus. The two graders agreed on 63 of 64 checks, and the one disagreement led to a stricter check. Sonnet's results are in [v1/results.jsonl](.claude/hillclimb/analyst-answers/v1/results.jsonl).
+
 ```bash
 uv run python evals/run_eval.py
 ```
@@ -121,15 +131,15 @@ That runs every question twice, for about $1.75. Useful options:
 - `--variant v1 --model claude-sonnet-5-5` saves results for a different setup next to the baseline.
 - `--regrade` re-grades saved answers after you change a check, without running the agent again.
 
-The grader is tested too. `evals/check_judge.py` confirms that correct answers pass and bad ones fail: empty, "I don't know", an answer to a different question, and a subtle mistake the agent really made. It costs about $0.08.
+The grader is tested too. `evals/check_judge.py` confirms that correct answers pass and bad ones fail: empty, "I don't know", an answer to a different question, and two subtle mistakes the agent really made. It costs about $0.09.
 
 ```bash
 uv run python evals/check_judge.py
 ```
 
-Building the eval caught two problems, one on each side:
+Building the eval caught problems on both sides:
 
-- **A grader that was too lenient.** It passed an answer that gave the right Matcha Latte figure and then ranked it wrongly. A ranking check now catches that.
+- **A grader that was too lenient, twice.** It passed an answer that gave the right Matcha Latte figure and then ranked it wrongly. Later it passed one that gave the wrong figure, because the answer said the 12-month average understated the Matcha. Both are checked now, and both answers are kept in `check_judge.py` as tests.
 - **A wrong answer key.** The first full run failed the agent for calling February the slowest month for iced drinks. January and February are tied (309 units each), so the key now accepts either. Reading failures before trusting them is what found it.
 
 ## Recording the demo
@@ -155,7 +165,8 @@ The agent runs model-written Python on your machine with your user's permissions
 
 ## Ideas to extend it
 
-- Use the eval to compare cheaper setups, such as Sonnet 5.5 or lower effort, and find the cheapest one that still passes.
+- Close Sonnet's one gap, averaging a product that wasn't on sale all year, with a line in the system prompt, then re-run the eval on Sonnet.
+- Try Opus at medium effort on the eval, to see whether it keeps 17 of 17 for less.
 - Add a `--confirm` flag that shows each piece of code and waits for approval before running it.
 - Support Excel, Parquet, or a SQL database as the data source.
 - Put a Streamlit or Gradio front end on it, with charts shown inline.

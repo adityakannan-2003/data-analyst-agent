@@ -66,7 +66,7 @@
     "tags": ["pattern", "trap"],
     "question": "What is the average monthly revenue of each product?",
     "criteria": [
-      {"id": "matcha_months", "text": "Accounts for the Matcha Latte only being on sale from March 2026: either averages it over its months on sale (about {matcha_avg_on_sale} a month) or clearly says that a 12-month average (about {matcha_avg_12}) understates it."},
+      {"id": "matcha_months", "text": "Accounts for the Matcha Latte only being on sale from March 2026: either averages it over its months on sale (about {matcha_avg_on_sale} a month) or clearly says that a 12-month average (about {matcha_avg_12}) understates it. If it gives a months-on-sale average, that figure must be about {matcha_avg_on_sale} (anything from {matcha_avg_on_sale_lo} to {matcha_avg_on_sale_hi} counts)."},
       {"id": "matcha_rank", "text": "If it says where the Matcha Latte ranks on its months-on-sale average, the ranking is right: above Espresso (about {espresso_avg} a month) and below Muffin (about {muffin_avg}). An answer that doesn't rank it on that basis meets this check."}
     ]
   },

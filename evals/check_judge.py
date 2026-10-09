@@ -37,11 +37,14 @@ CORRECT = {
 }
 BAD_SAMPLE = ["top-store", "price-increase", "total-revenue", "product-averages", "customer-age"]
 # Plausible answers with one specific mistake each, taken from real agent runs. All should fail.
-SUBTLE_MISTAKES = {
-    "product-averages": "Matcha Latte brings in the least, about {matcha_avg_12} a month averaged over the full year. "
-    "It had no sales before March 2026, so it probably launched then. Averaged over just its 7 months on sale, "
-    "it makes about {matcha_avg_on_sale} a month, which would put it just behind Espresso.",
-}
+SUBTLE_MISTAKES = [
+    ("product-averages", "Matcha Latte brings in the least, about {matcha_avg_12} a month averaged over the full year. "
+     "It had no sales before March 2026, so it probably launched then. Averaged over just its 7 months on sale, "
+     "it makes about {matcha_avg_on_sale} a month, which would put it just behind Espresso."),  # wrong ranking
+    ("product-averages", "- Matcha Latte: {matcha_avg_12} over 12 months, or $1,031 over its 7 selling months\n\n"
+     "Matcha Latte has no sales from Oct 2025 to Feb 2026, so it looks like it launched in March 2026. "
+     "I counted those months as $0 in the {matcha_avg_12} figure. If you only want the months it was on sale, use $1,031."),  # wrong figure
+]
 
 
 def main() -> None:
@@ -55,7 +58,7 @@ def main() -> None:
         other = ids[(ids.index(cid) + 3) % len(ids)]
         trials += [(cid, "empty", "", False), (cid, "I don't know", "I don't know.", False),
                    (cid, f"answer to {other}", correct[other], False)]
-    trials += [(cid, "subtle mistake", text.format_map(values), False) for cid, text in SUBTLE_MISTAKES.items()]
+    trials += [(cid, "subtle mistake", text.format_map(values), False) for cid, text in SUBTLE_MISTAKES]
 
     client = anthropic.Anthropic(max_retries=8)
     with ThreadPoolExecutor(8) as pool:
