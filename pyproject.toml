@@ -1,0 +1,22 @@
+[project]
+name = "data-analyst-agent"
+version = "0.1.0"
+description = "Ask questions about a CSV in plain English. A tool-calling agent on the Claude API, written without an agent framework."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic",
+    "pandas",
+    "matplotlib",
+    "python-dotenv",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
