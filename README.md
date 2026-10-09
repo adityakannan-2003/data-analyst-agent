@@ -110,15 +110,19 @@ Each question has checks with expected values that [evals/answer_key.py](evals/a
 
 **Baseline: all 17 questions pass on both runs** with `claude-opus-5-5` at high effort (95% interval: 82% to 100%). An answer costs about $0.05 and takes about 16 seconds. Every answer and grade is in [results.jsonl](.claude/hillclimb/analyst-answers/baseline/results.jsonl). With a perfect baseline, the eval's main use is catching regressions, for example when trying a cheaper model or lower effort.
 
-**Opus 5.5 vs. Sonnet 5.5**, with the same prompt, tools, effort and grader, 2 runs per question:
+**Opus 5.5 vs. Sonnet 5.5**, with the same tools, effort and grader:
 
-| | Opus 5.5 | Sonnet 5.5 |
-|---|---|---|
-| Questions passed on both runs | 17 of 17 | 16 of 17 |
-| Cost per answer | $0.047 | $0.020 |
-| Time per answer | 16 s | 11 s |
+| | Opus 5.5 | Sonnet 5.5 | Sonnet 5.5, prompt fix | Opus 5.5, prompt fix |
+|---|---|---|---|---|
+| Questions passed on every run | 17 of 17 | 16 of 17 | 17 of 17 | 17 of 17 |
+| Matcha average question | 2 of 2 | 1 of 6 | 6 of 6 | 2 of 2 |
+| Cost per answer | $0.047 | $0.020 | $0.021 | $0.049 |
+| Time per answer | 16 s | 11 s | 10 s | 17 s |
+| Results | [baseline](.claude/hillclimb/analyst-answers/baseline/results.jsonl) | [v1](.claude/hillclimb/analyst-answers/v1/results.jsonl) | [v2](.claude/hillclimb/analyst-answers/v2/results.jsonl) | [v3](.claude/hillclimb/analyst-answers/v3/results.jsonl) |
 
-Sonnet costs 57% less and misses only the Matcha Latte average. In one run it averaged the Matcha over all 12 months without noting the March launch. In the other it noticed the launch but gave the wrong figure: $1,031 instead of $1,238. Opus got it right both times. Sonnet also graded its own answers here, so I re-graded them with Opus. The two graders agreed on 63 of 64 checks, and the one disagreement led to a stricter check. Sonnet's results are in [v1/results.jsonl](.claude/hillclimb/analyst-answers/v1/results.jsonl).
+On the original prompt, Sonnet missed only the Matcha Latte average, which it passed in 1 of 6 runs. It either averaged over all 12 months without noting the March launch, or noticed the launch and got the figure wrong ($1,031 instead of $1,238). One line in the system prompt fixed that: when averaging over time, check that everything was around for the whole period. With it, Sonnet passes every question at under half the cost of Opus, and Opus still passes everything. I wrote the line after seeing the failure, and only the Matcha question tests it, so this shows the fix works. It doesn't show that the fix generalizes.
+
+Sonnet also graded its own answers here, so I re-graded them with Opus. The two graders agreed on 63 of 64 checks, and the one disagreement led to a stricter check.
 
 ```bash
 uv run python evals/run_eval.py
@@ -165,7 +169,7 @@ The agent runs model-written Python on your machine with your user's permissions
 
 ## Ideas to extend it
 
-- Close Sonnet's one gap, averaging a product that wasn't on sale all year, with a line in the system prompt, then re-run the eval on Sonnet.
+- Add a second question about something that wasn't around all year, to test whether the prompt fix generalizes.
 - Try Opus at medium effort on the eval, to see whether it keeps 17 of 17 for less.
 - Add a `--confirm` flag that shows each piece of code and waits for approval before running it.
 - Support Excel, Parquet, or a SQL database as the data source.

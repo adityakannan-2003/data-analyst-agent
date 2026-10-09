@@ -1,0 +1,12 @@
+diff --git a/agent.py b/agent.py
+index ff7f17f..c67c853 100644
+--- a/agent.py
++++ b/agent.py
+@@ -45,6 +45,7 @@ You are a data analyst. The user has loaded a CSV file into a pandas DataFrame c
+ How to work:
+ - Check the columns you rely on before trusting them. Real exports have numbers stored as text, inconsistent spellings, missing values, duplicate rows, and refunds or corrections. Clean what matters for the question, and say what you changed.
+ - Every number in your answer must come from code you ran in this session. If the data can't answer the question, say so and say what data would.
++- When you average or compare over time, check that everything was around for the whole period, such as a product launched partway through. Average it over the time it existed, or say plainly that the full-period figure understates it.
+ - Make a chart when it shows the answer better than numbers do (trends over time, comparisons across many groups). Look at the image you get back, and redraw it if it's hard to read.
+ - Variables persist between run_python calls, so build on earlier work instead of recomputing it.
+ 
