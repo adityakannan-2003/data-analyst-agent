@@ -4,7 +4,7 @@ from types import SimpleNamespace as NS
 
 import pytest
 
-from agent import Agent
+from agent import MODEL, Agent
 
 
 class FakeStream:
@@ -39,7 +39,7 @@ class FakeClient:
 
 def turn(*content, stop_reason="end_turn"):
     usage = NS(input_tokens=10, output_tokens=5, cache_read_input_tokens=0, cache_creation_input_tokens=0)
-    return NS(content=list(content), stop_reason=stop_reason, usage=usage)
+    return NS(content=list(content), stop_reason=stop_reason, usage=usage, model=MODEL)
 
 
 def tool_use(block_id, tool, **input):
@@ -62,9 +62,11 @@ def test_runs_tools_until_the_model_answers(agent):
         turn(tool_use("t1", "run_python", code="df.sales.sum()"), stop_reason="tool_use"),
         turn(text("Total sales are 22.")),
     ])
-    agent.ask("What are total sales?")
+    answer = agent.ask("What are total sales?")
 
     assert [m["role"] for m in agent.messages] == ["user", "assistant", "user", "assistant"]
+    assert (answer.text, answer.status, answer.usage.tool_calls) == ("Total sales are 22.", "ok", 1)
+    assert answer.models == [MODEL, MODEL]
     result = agent.messages[2]["content"][0]
     assert result == {"type": "tool_result", "tool_use_id": "t1", "content": "22\n", "is_error": False}
     assert len(agent.client.requests) == 2
@@ -126,6 +128,20 @@ def test_refusal_rolls_back_the_question(agent):
         turn(stop_reason="refusal"),
     ])
     agent.ask("First question")
-    agent.ask("Declined question")
+    answer = agent.ask("Declined question")
 
+    assert answer.status == "refused"
     assert [m["role"] for m in agent.messages] == ["user", "assistant"]
+
+
+def test_quiet_mode_prints_nothing(csv_path, capsys):
+    quiet = Agent(csv_path, csv_path.parent, quiet=True)
+    try:
+        quiet.client = FakeClient([
+            turn(tool_use("t1", "run_python", code="print('hi')"), stop_reason="tool_use"),
+            turn(text("Done.")),
+        ])
+        assert quiet.ask("Question").text == "Done."
+    finally:
+        quiet.sandbox.close()
+    assert capsys.readouterr().out == ""

@@ -98,6 +98,40 @@ uv run pytest
 
 No API key needed. The sandbox tests run real code. The agent-loop tests replace the API with a fake client that returns scripted model turns: tool calls, parallel calls, malformed input, cut-off input, charts, and refusals.
 
+## Evaluation
+
+The tests check the code; the eval checks the answers. [evals/cases.json](evals/cases.json) has 17 questions:
+
+- 9 about the planted patterns, including the two traps
+- 6 that only come out right if the data is cleaned first
+- 2 the data can't answer (profit margin, customer age), where the agent should say so instead of guessing
+
+Each question has checks with expected values that [evals/answer_key.py](evals/answer_key.py) computes from the data. Claude Sonnet 5.5 grades each answer against its checks, and a question passes only if every check does.
+
+**Baseline: all 17 questions pass on both runs** with `claude-opus-5-5` at high effort (95% interval: 82% to 100%). An answer costs about $0.05 and takes about 16 seconds. Every answer and grade is in [results.jsonl](.claude/hillclimb/analyst-answers/baseline/results.jsonl). With a perfect baseline, the eval's main use is catching regressions, for example when trying a cheaper model or lower effort.
+
+```bash
+uv run python evals/run_eval.py
+```
+
+That runs every question twice, for about $1.75. Useful options:
+
+- `--cases price-increase,refunds` runs only some questions.
+- `--reps 1` runs each question once.
+- `--variant v1 --model claude-sonnet-5-5` saves results for a different setup next to the baseline.
+- `--regrade` re-grades saved answers after you change a check, without running the agent again.
+
+The grader is tested too. `evals/check_judge.py` confirms that correct answers pass and bad ones fail: empty, "I don't know", an answer to a different question, and a subtle mistake the agent really made. It costs about $0.08.
+
+```bash
+uv run python evals/check_judge.py
+```
+
+Building the eval caught two problems, one on each side:
+
+- **A grader that was too lenient.** It passed an answer that gave the right Matcha Latte figure and then ranked it wrongly. A ranking check now catches that.
+- **A wrong answer key.** The first full run failed the agent for calling February the slowest month for iced drinks. January and February are tied (309 units each), so the key now accepts either. Reading failures before trusting them is what found it.
+
 ## Recording the demo
 
 [docs/demo.gif](docs/demo.gif) is made by [scripts/make_demo_gif.py](scripts/make_demo_gif.py). The script runs the agent on a question, records everything it prints with timestamps, and draws each moment as a terminal frame with Pillow. Waits longer than 1.5 seconds are shortened, and the typing is animated.
@@ -121,7 +155,7 @@ The agent runs model-written Python on your machine with your user's permissions
 
 ## Ideas to extend it
 
-- Turn the planted patterns into an eval set that scores answers automatically, then compare models and effort levels.
+- Use the eval to compare cheaper setups, such as Sonnet 5.5 or lower effort, and find the cheapest one that still passes.
 - Add a `--confirm` flag that shows each piece of code and waits for approval before running it.
 - Support Excel, Parquet, or a SQL database as the data source.
 - Put a Streamlit or Gradio front end on it, with charts shown inline.

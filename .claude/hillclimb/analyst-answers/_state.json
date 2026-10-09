@@ -1,0 +1,11 @@
+{
+  "metrics": [
+    {"id": "pass", "label": "Pass", "kind": "binary"},
+    {"id": "checks", "label": "Checks met", "kind": "float", "scale": 1}
+  ],
+  "perf_fields": [
+    {"id": "cost_usd", "label": "Cost", "unit": "$"},
+    {"id": "latency_s", "label": "Time", "unit": "s"},
+    {"id": "tool_calls", "label": "Tool calls"}
+  ]
+}

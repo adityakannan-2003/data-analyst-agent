@@ -18,7 +18,7 @@ import json
 import os
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import anthropic
@@ -109,27 +109,45 @@ def profile(df: pd.DataFrame, name: str, max_columns: int = 60) -> str:
 @dataclass
 class Usage:
     tool_calls: int = 0
-    input_tokens: int = 0
-    cached_tokens: int = 0
+    input_tokens: int = 0  # all input, including tokens read from or written to the cache
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
     output_tokens: int = 0
 
     def add(self, usage) -> None:
-        cache_read = usage.cache_read_input_tokens or 0
-        self.cached_tokens += cache_read
-        self.input_tokens += usage.input_tokens + (usage.cache_creation_input_tokens or 0) + cache_read
+        cache_read, cache_write = usage.cache_read_input_tokens or 0, usage.cache_creation_input_tokens or 0
+        self.cache_read_tokens += cache_read
+        self.cache_write_tokens += cache_write
+        self.input_tokens += usage.input_tokens + cache_write + cache_read
         self.output_tokens += usage.output_tokens
 
     def __str__(self) -> str:
         return (
             f"{self.tool_calls} tool calls · {self.input_tokens / 1000:.1f}k input tokens "
-            f"({self.cached_tokens / 1000:.1f}k from cache) · {self.output_tokens / 1000:.1f}k output tokens"
+            f"({self.cache_read_tokens / 1000:.1f}k from cache) · {self.output_tokens / 1000:.1f}k output tokens"
         )
+
+
+@dataclass
+class Answer:
+    """What ask() returns: the final answer and what it took to get there."""
+
+    text: str = ""
+    status: str = "ok"  # ok, truncated, refused, max_steps, cancelled, or error
+    error: str = ""
+    usage: Usage = field(default_factory=Usage)
+    models: list[str] = field(default_factory=list)  # the model that served each turn
+
+
+def silent(*args, **kwargs) -> None:
+    pass
 
 
 class StreamPrinter:
     """Prints one streamed model turn: progress notes dimmed, answer text as it arrives."""
 
-    def __init__(self):
+    def __init__(self, out=print):
+        self.out = out
         self.in_note = False
         self.at_line_start = True
 
@@ -152,13 +170,13 @@ class StreamPrinter:
             self.newline()
 
     def write(self, text: str) -> None:
-        print(text, end="", flush=True)
+        self.out(text, end="", flush=True)
         if text and text != RESET:
             self.at_line_start = text.endswith("\n")
 
     def newline(self) -> None:
         if not self.at_line_start:
-            print()
+            self.out()
             self.at_line_start = True
 
     def finish(self) -> None:
@@ -167,24 +185,24 @@ class StreamPrinter:
         self.newline()
 
 
-def show_tool_call(name: str, code: str, max_lines: int = 8) -> None:
+def show_tool_call(name: str, code: str, out=print, max_lines: int = 8) -> None:
     lines = code.strip().splitlines()
     if len(lines) > max_lines:
         lines = lines[:max_lines] + [f"... ({len(lines) - max_lines} more lines)"]
-    print(f"{DIM}  ▸ {name}")
+    out(f"{DIM}  ▸ {name}")
     for line in lines:
-        print(f"    │ {line}")
-    print(RESET, end="")
+        out(f"    │ {line}")
+    out(RESET, end="")
 
 
-def show_result(ok: bool, output: str) -> None:
+def show_result(ok: bool, output: str, out=print) -> None:
     lines = output.strip().splitlines()
     if ok:
         first = lines[0][:90] if lines else "(no output)"
         more = f"  (+{len(lines) - 1} lines)" if len(lines) > 1 else ""
-        print(f"{DIM}    ✓ {first}{more}{RESET}")
+        out(f"{DIM}    ✓ {first}{more}{RESET}")
     else:
-        print(f"{RED}    ✗ {lines[-1][:120] if lines else 'error'}{RESET}")
+        out(f"{RED}    ✗ {lines[-1][:120] if lines else 'error'}{RESET}")
 
 
 def slug(text: str) -> str:
@@ -192,7 +210,7 @@ def slug(text: str) -> str:
 
 
 class Agent:
-    def __init__(self, csv_path: Path, out_dir: Path, model: str = MODEL, effort: str = "high"):
+    def __init__(self, csv_path: Path, out_dir: Path, model: str = MODEL, effort: str = "high", quiet: bool = False):
         df = pd.read_csv(csv_path)
         self.shape = df.shape
         self.system = SYSTEM_PROMPT.format(profile=profile(df, csv_path.name))
@@ -200,34 +218,39 @@ class Agent:
         self.model = model
         self.effort = effort
         self.out_dir = out_dir
+        self.out = silent if quiet else print  # quiet mode lets several agents run side by side (see evals/)
         self.sandbox = Sandbox(csv_path, out_dir)
         self.messages: list = []  # the whole conversation, so follow-up questions have context
         self.charts = 0
 
-    def ask(self, question: str) -> None:
+    def ask(self, question: str) -> Answer:
         """Answer one question: call the model, run the tools it asks for, repeat until it answers."""
         start = len(self.messages)
         self.messages.append({"role": "user", "content": question})
-        usage = Usage()
+        answer = Answer()
         try:
             for _ in range(MAX_STEPS):
                 response = self._call_model()
-                usage.add(response.usage)
+                answer.usage.add(response.usage)
+                answer.models.append(response.model)
 
                 if response.stop_reason == "refusal":
                     del self.messages[start:]  # drop the declined question so later questions still work
-                    print(f"\n{RED}The model declined this request.{RESET}")
-                    return
+                    self.out(f"\n{RED}The model declined this request.{RESET}")
+                    answer.status = "refused"
+                    return answer
 
                 # Append the turn unchanged (thinking blocks included); the API expects history as it was sent.
                 self.messages.append({"role": "assistant", "content": response.content})
                 tool_calls = [block for block in response.content if block.type == "tool_use"]
 
                 if not tool_calls:
+                    answer.text = "".join(block.text for block in response.content if block.type == "text")
                     if response.stop_reason == "max_tokens":
-                        print(f"{RED}[The answer was cut off at the output limit.]{RESET}")
-                    print(f"\n{DIM}({usage}){RESET}")
-                    return
+                        answer.status = "truncated"
+                        self.out(f"{RED}[The answer was cut off at the output limit.]{RESET}")
+                    self.out(f"\n{DIM}({answer.usage}){RESET}")
+                    return answer
 
                 if response.stop_reason == "max_tokens":
                     # A tool input cut off mid-stream still parses as a valid-looking object. Don't run it.
@@ -237,22 +260,26 @@ class Agent:
                     ]
                 else:
                     results = [self._run_tool(block) for block in tool_calls]
-                usage.tool_calls += len(tool_calls)
+                answer.usage.tool_calls += len(tool_calls)
                 # All results go back in one user message, which keeps parallel tool calls working.
                 self.messages.append({"role": "user", "content": results})
 
-            print(f"\n{RED}Stopped after {MAX_STEPS} steps without a final answer.{RESET}")
+            self.out(f"\n{RED}Stopped after {MAX_STEPS} steps without a final answer.{RESET}")
+            answer.status = "max_steps"
         except KeyboardInterrupt:
             del self.messages[start:]
-            print(f"\n{DIM}[cancelled]{RESET}")
+            self.out(f"\n{DIM}[cancelled]{RESET}")
+            answer.status = "cancelled"
         except (anthropic.APIError, RuntimeError) as exc:
             del self.messages[start:]
-            print(f"\n{RED}Error: {exc}{RESET}")
+            self.out(f"\n{RED}Error: {exc}{RESET}")
+            answer.status, answer.error = "error", f"{type(exc).__name__}: {exc}"
+        return answer
 
     def _call_model(self):
         """One model turn, streamed so progress notes and the answer print as they arrive."""
         for _ in range(3):
-            printer = StreamPrinter()
+            printer = StreamPrinter(self.out)
             try:
                 with self.client.beta.messages.stream(
                     model=self.model,
@@ -285,10 +312,10 @@ class Agent:
         if not valid:
             return self._error(block, f"Invalid input for {block.name}: {json.dumps(args)[:500]}")
 
-        show_tool_call(block.name, args["code"])
+        show_tool_call(block.name, args["code"], self.out)
         if block.name == "run_python":
             ok, output = self.sandbox.run(args["code"])
-            show_result(ok, output)
+            show_result(ok, output, self.out)
             return {"type": "tool_result", "tool_use_id": block.id, "content": output or "(no output)", "is_error": not ok}
 
         if block.name == "save_chart":
@@ -296,10 +323,10 @@ class Agent:
             filename = f"chart_{self.charts}_{slug(args['name'])}.png"
             ok, output = self.sandbox.chart(args["code"], filename)
             if not ok:
-                show_result(ok, output)
+                show_result(ok, output, self.out)
                 return {"type": "tool_result", "tool_use_id": block.id, "content": output, "is_error": True}
             path = self.out_dir / filename
-            print(f"{DIM}    ✓ saved {path}{RESET}")
+            self.out(f"{DIM}    ✓ saved {path}{RESET}")
             note = f"Saved to {path}." + (f"\nOutput:\n{output}" if output.strip() else "")
             image = base64.standard_b64encode(path.read_bytes()).decode()
             return {
@@ -314,9 +341,8 @@ class Agent:
 
         return self._error(block, f"Unknown tool: {block.name}")
 
-    @staticmethod
-    def _error(block, message: str) -> dict:
-        print(f"{RED}    ✗ {message[:120]}{RESET}")
+    def _error(self, block, message: str) -> dict:
+        self.out(f"{RED}    ✗ {message[:120]}{RESET}")
         return {"type": "tool_result", "tool_use_id": block.id, "content": message, "is_error": True}
 
 

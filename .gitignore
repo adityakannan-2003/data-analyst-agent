@@ -5,3 +5,12 @@ __pycache__/
 out/
 .DS_Store
 !.env.example
+
+# Eval output: keep the code, _state.json and results.jsonl; the rest is regenerated or local review
+.claude/hillclimb/**/traces/
+.claude/hillclimb/**/charts/
+.claude/hillclimb/**/trajectory/
+.claude/hillclimb/**/report.html
+.claude/hillclimb/**/state.json
+.claude/hillclimb/**/*.md
+.claude/hillclimb/**/*.log
