@@ -4,12 +4,13 @@ Ask questions about any CSV file in plain English. The agent writes pandas code,
 
 It's built directly on the Claude API. The agent loop is written by hand in about 70 lines (`Agent.ask` in [agent.py](agent.py)), with no agent framework.
 
-```
-$ uv run python agent.py data/coffee_sales.csv
-Loaded coffee_sales.csv: 33,155 rows x 8 columns. Model: claude-opus-5-5, effort: high.
+![The agent answering "Did the April price increase hurt latte sales?" in a terminal](docs/demo.gif)
 
-> Did the April price increase hurt latte sales?
-```
+This is a trick question. Latte sales fell 47% after the price rise, but espresso, whose price didn't change, fell 36% too, because customers switch to iced drinks in summer. The agent catches this and uses espresso as a baseline to estimate the price effect on its own: about 17%. The recording is real, with the model's thinking pauses shortened.
+
+The chart it drew for that answer, with each drink's units set to 100 for the months before the increase:
+
+![Monthly units for latte, cappuccino, espresso and iced drinks. After April, latte and cappuccino fall below espresso](docs/price-increase-chart.png)
 
 ## How it works
 
