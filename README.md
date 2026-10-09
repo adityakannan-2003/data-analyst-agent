@@ -98,6 +98,20 @@ uv run pytest
 
 No API key needed. The sandbox tests run real code. The agent-loop tests replace the API with a fake client that returns scripted model turns: tool calls, parallel calls, malformed input, cut-off input, charts, and refusals.
 
+## Recording the demo
+
+[docs/demo.gif](docs/demo.gif) is made by [scripts/make_demo_gif.py](scripts/make_demo_gif.py). The script runs the agent on a question, records everything it prints with timestamps, and draws each moment as a terminal frame with Pillow. Waits longer than 1.5 seconds are shortened, and the typing is animated.
+
+```bash
+uv run python scripts/make_demo_gif.py
+```
+
+That costs one agent run. To ask a different question, pass it as the first argument. The recording is saved to `out/demo_recording.json`, so you can adjust the look and re-render it without calling the API:
+
+```bash
+uv run python scripts/make_demo_gif.py --replay out/demo_recording.json
+```
+
 ## Safety
 
 The agent runs model-written Python on your machine with your user's permissions. The child process protects the agent from crashes and hangs. It does not stop malicious code. Two things to keep in mind:
