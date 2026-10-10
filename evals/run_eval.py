@@ -344,8 +344,14 @@ def main() -> None:
         summarize(variant_dir, cases)
         return
 
-    done = {(r["prompt_id"], r["rep"]) for r in read_jsonl(results_path)}
+    existing = read_jsonl(results_path)
+    done = {(r["prompt_id"], r["rep"]) for r in existing}
     todo = [(c, rep) for c in cases for rep in range(args.reps) if (c["id"], rep) not in done]
+    ran_with = {r["model"] for r in existing}
+    if todo and ran_with and ran_with != {args.model}:  # never mix two models' results in one variant
+        taken = [int(d.name[1:]) for d in FLOW.glob("v*") if re.fullmatch(r"v\d+", d.name)]
+        sys.exit(f"{args.variant} was run with {', '.join(sorted(ran_with))}, not {args.model}. "
+                 f"Save these results under a new variant, for example --variant v{max(taken, default=0) + 1}.")
     print(f"{len(todo)} runs to do on {args.model} (effort {args.effort}), {len(done)} already done. Judge: {args.judge_model}.")
 
     judge_client = anthropic.Anthropic(max_retries=8)

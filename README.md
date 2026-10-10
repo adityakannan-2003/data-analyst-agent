@@ -6,9 +6,9 @@ It's built directly on the Claude API. The agent loop is written by hand in abou
 
 ![The agent answering "Did the April price increase hurt latte sales?" in a terminal](docs/demo.gif)
 
-This is a trick question. Latte sales fell 47% after the price rise, but espresso, whose price didn't change, fell 36% too, because customers switch to iced drinks in summer. The agent catches this and uses espresso as a baseline to estimate the price effect on its own: about 17%. The recording is real, with the model's thinking pauses shortened.
+This is a trick question. Latte sales fell 47% after the price rise, but customers also switch to iced drinks in summer, so some of that drop would have happened anyway. The agent (Sonnet 5.5, the default) compares lattes with items whose price didn't change, flags the seasonal shift and the Matcha Latte launch, and concludes the real price effect is smaller than the raw drop. The recording is real, with the model's thinking pauses shortened.
 
-The chart it drew for that answer, with each drink's units set to 100 for the months before the increase:
+An earlier run on Opus 5.5 drew this chart for the same question, with each drink's units set to 100 for the months before the increase. Lattes and cappuccinos fall below espresso, whose price didn't change:
 
 ![Monthly units for latte, cappuccino, espresso and iced drinks. After April, latte and cappuccino fall below espresso](docs/price-increase-chart.png)
 
@@ -86,7 +86,7 @@ uv run python agent.py data/coffee_sales.csv -q "Which store makes the most reve
 
 Options:
 
-- `--model`: defaults to `claude-opus-5-5`. `claude-sonnet-5-5` costs half as much.
+- `--model`: defaults to `claude-sonnet-5-5`, which passes every eval question at under half the cost of `claude-opus-5-5`. Opus is the more careful choice: it passed every question even before the prompt fix described under Evaluation.
 - `--effort`: `low` to `max`, defaults to `high`. Lower is faster and cheaper; higher is more careful.
 - `--out`: the folder for charts, `out/` by default.
 
@@ -100,17 +100,18 @@ No API key needed. The sandbox tests run real code. The agent-loop tests replace
 
 ## Evaluation
 
-The tests check the code; the eval checks the answers. [evals/cases.json](evals/cases.json) has 17 questions:
+The tests check the code; the eval checks the answers. [evals/cases.json](evals/cases.json) has 22 questions:
 
 - 9 about the planted patterns, including the two traps
 - 6 that only come out right if the data is cleaned first
 - 2 the data can't answer (profit margin, customer age), where the agent should say so instead of guessing
+- 5 held-out questions, added later to check the results on traps the others don't use
 
 Each question has checks with expected values that [evals/answer_key.py](evals/answer_key.py) computes from the data. Claude Sonnet 5.5 grades each answer against its checks, and a question passes only if every check does.
 
-**Baseline: all 17 questions pass on both runs** with `claude-opus-5-5` at high effort (95% interval: 82% to 100%). An answer costs about $0.05 and takes about 16 seconds. Every answer and grade is in [results.jsonl](.claude/hillclimb/analyst-answers/baseline/results.jsonl). With a perfect baseline, the eval's main use is catching regressions, for example when trying a cheaper model or lower effort.
+**Baseline: all 17 original questions pass on both runs** with `claude-opus-5-5` at high effort (95% interval: 82% to 100%). An answer costs about $0.05 and takes about 16 seconds. Every answer and grade is in [results.jsonl](.claude/hillclimb/analyst-answers/baseline/results.jsonl). With a perfect baseline, the eval's main use is catching regressions, for example when trying a cheaper model or lower effort.
 
-**Opus 5.5 vs. Sonnet 5.5**, with the same tools, effort and grader:
+**Opus 5.5 vs. Sonnet 5.5** on the original 17 questions, with the same tools, effort and grader:
 
 | | Opus 5.5 | Sonnet 5.5 | Sonnet 5.5, prompt fix | Opus 5.5, prompt fix |
 |---|---|---|---|---|
@@ -122,20 +123,30 @@ Each question has checks with expected values that [evals/answer_key.py](evals/a
 
 On the original prompt, Sonnet missed only the Matcha Latte average, which it passed in 1 of 6 runs. It either averaged over all 12 months without noting the March launch, or noticed the launch and got the figure wrong ($1,031 instead of $1,238). One line in the system prompt fixed that: when averaging over time, check that everything was around for the whole period. With it, Sonnet passes every question at under half the cost of Opus, and Opus still passes everything. I wrote the line after seeing the failure, and only the Matcha question tests it, so this shows the fix works. It doesn't show that the fix generalizes.
 
+**Held-out check.** To test whether that result holds on problems the prompt wasn't tuned for, I wrote five more questions and froze the prompt before running them. They cover a latte price that changed mid-year, average order value, the share of orders with food, and the share of loyalty members who pay cash. The fifth asks about half-year growth, where the Matcha's late launch comes back in a different question.
+
+| Held-out questions, 3 runs each | Sonnet 5.5 | Opus 5.5 |
+|---|---|---|
+| Questions passed on every run | 5 of 5 | 5 of 5 |
+| Cost per answer | $0.019 | $0.040 |
+| Time per answer | 10 s | 16 s |
+
+Both models avoided every trap, and every run flagged the Matcha's growth as a launch effect. That's why the agent now defaults to Sonnet 5.5 with the prompt fix. One gap remains: I didn't run the old prompt on the growth question, so I can't say whether the prompt fix is what made Sonnet flag the Matcha there.
+
 Sonnet also graded its own answers here, so I re-graded them with Opus. The two graders agreed on 63 of 64 checks, and the one disagreement led to a stricter check.
 
 ```bash
 uv run python evals/run_eval.py
 ```
 
-That runs every question twice, for about $1.75. Useful options:
+That runs every question twice on the default model: about $1.05 with Sonnet, including grading. Results for the setups above are committed, so running a finished variant again just prints its summary. Useful options:
 
 - `--cases price-increase,refunds` runs only some questions.
 - `--reps 1` runs each question once.
-- `--variant v1 --model claude-sonnet-5-5` saves results for a different setup next to the baseline.
+- `--variant v4 --model claude-opus-5-5` saves results for a different setup next to the others. Each variant holds one model's results; the runner refuses to mix them.
 - `--regrade` re-grades saved answers after you change a check, without running the agent again.
 
-The grader is tested too. `evals/check_judge.py` confirms that correct answers pass and bad ones fail: empty, "I don't know", an answer to a different question, and two subtle mistakes the agent really made. It costs about $0.09.
+The grader is tested too. `evals/check_judge.py` confirms that correct answers pass and bad ones fail: empty, "I don't know", an answer to a different question, two subtle mistakes the agent really made, and the trap answer for each held-out question. It costs about $0.11.
 
 ```bash
 uv run python evals/check_judge.py
@@ -144,7 +155,7 @@ uv run python evals/check_judge.py
 Building the eval caught problems on both sides:
 
 - **A grader that was too lenient, twice.** It passed an answer that gave the right Matcha Latte figure and then ranked it wrongly. Later it passed one that gave the wrong figure, because the answer said the 12-month average understated the Matcha. Both are checked now, and both answers are kept in `check_judge.py` as tests.
-- **A wrong answer key.** The first full run failed the agent for calling February the slowest month for iced drinks. January and February are tied (309 units each), so the key now accepts either. Reading failures before trusting them is what found it.
+- **A wrong answer key, twice.** The first full run failed the agent for calling February the slowest month for iced drinks, but January and February are tied (309 units each). Later, both models failed the held-out growth question on every run, because the key assumed "grew the most" meant percentage. Iced Latte wins in dollars and Cold Brew in percentage, and every answer covered both. Both keys now accept either reading. Reading failures before trusting them is what found these.
 
 ## Recording the demo
 
@@ -169,8 +180,8 @@ The agent runs model-written Python on your machine with your user's permissions
 
 ## Ideas to extend it
 
-- Add a second question about something that wasn't around all year, to test whether the prompt fix generalizes.
-- Try Opus at medium effort on the eval, to see whether it keeps 17 of 17 for less.
+- Run the old prompt on the half-year growth question, to see whether the prompt fix is what makes Sonnet flag the Matcha's launch.
+- Try Sonnet at medium effort on the eval, to see whether it keeps 22 of 22 for less.
 - Add a `--confirm` flag that shows each piece of code and waits for approval before running it.
 - Support Excel, Parquet, or a SQL database as the data source.
 - Put a Streamlit or Gradio front end on it, with charts shown inline.

@@ -30,7 +30,7 @@ from sandbox import Sandbox
 with contextlib.suppress(ImportError):
     import readline  # noqa: F401  (arrow keys and history in input())
 
-MODEL = "claude-opus-5-5"
+MODEL = "claude-sonnet-5-5"  # passes every eval question (see evals/) at under half the cost of claude-opus-5-5
 MAX_STEPS = 25  # model turns per question, so a confused run can't loop forever
 BETAS = [
     "server-side-fallback-2026-07-01",  # fallbacks="default": retry a declined request on another model

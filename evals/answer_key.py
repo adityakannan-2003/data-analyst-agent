@@ -96,4 +96,29 @@ def facts(csv_path: Path) -> dict[str, str]:
     filled = df["store"].fillna(df.groupby("order_id")["store"].transform("first"))
     f["missing_rows_after_fill"] = str(int(filled.isna().sum()))
     f["missing_rev_after_fill"] = money(df.loc[filled.isna(), "revenue"].sum())
+
+    # Held-out questions: written after the prompt fix, never used to change the prompt
+    lattes = sales[sales["product"] == "Latte"]
+    price = (lattes["price"] * lattes["quantity"]).sum() / lattes["quantity"].sum()
+    f["latte_avg_price"], f["latte_price_lo"], f["latte_price_hi"] = (f"${x:.2f}" for x in (price, price - 0.03, price + 0.03))
+    order_value = df.groupby("order_id")["revenue"].sum().mean()
+    f["avg_order_value"], f["aov_lo"], f["aov_hi"] = (f"${x:.2f}" for x in (order_value, order_value * 0.99, order_value * 1.01))
+    f["avg_line_value"] = f"${df['revenue'].mean():.2f}"
+    food = df["product"].isin(["Croissant", "Muffin"])
+    food_share = food.groupby(df["order_id"]).any().mean()
+    f["food_order_share"], f["food_lo"], f["food_hi"] = (f"{x:.1%}" for x in (food_share, food_share - 0.015, food_share + 0.015))
+    f["food_line_share"] = f"{food.mean():.1%}"
+    orders = df.drop_duplicates("order_id")  # payment and loyalty are the same on every line of an order
+    cash_share = (orders.loc[orders["loyalty_member"] == "yes", "payment_method"] == "cash").mean()
+    f["cash_among_loyal"], f["cash_lo"], f["cash_hi"] = (f"{x:.1%}" for x in (cash_share, cash_share - 0.015, cash_share + 0.015))
+    f["loyal_among_cash"] = f"{(orders.loc[orders['payment_method'] == 'cash', 'loyalty_member'] == 'yes').mean():.1%}"
+    halves = df.groupby(["product", df["ts"] >= "2026-04-01"])["quantity"].sum().unstack()
+    growth = halves[True] / halves[False] - 1
+    f["matcha_growth"], f["cold_brew_growth"], f["iced_latte_growth"] = (
+        f"+{growth[name]:.0%}" for name in ["Matcha Latte", "Cold Brew", "Iced Latte"]
+    )
+    # "Grew the most" can mean dollars or percent, and the two iced drinks win one each
+    revenue_halves = df.groupby(["product", df["ts"] >= "2026-04-01"])["revenue"].sum().unstack()
+    gain = revenue_halves[True] - revenue_halves[False]
+    f["iced_latte_gain"], f["cold_brew_gain"] = money(gain["Iced Latte"]), money(gain["Cold Brew"])
     return f

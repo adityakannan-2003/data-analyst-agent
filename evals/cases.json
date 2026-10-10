@@ -1,153 +1,363 @@
 [
   {
     "id": "top-store",
-    "tags": ["pattern"],
+    "tags": [
+      "pattern"
+    ],
     "question": "Which store brought in the most revenue over the year, and how much?",
     "criteria": [
-      {"id": "downtown", "text": "Names Downtown as the store with the most revenue."},
-      {"id": "amount", "text": "Gives Downtown's revenue for the year as about {downtown_revenue} (anything from {downtown_revenue_lo} to {downtown_revenue_hi} counts)."}
+      {
+        "id": "downtown",
+        "text": "Names Downtown as the store with the most revenue."
+      },
+      {
+        "id": "amount",
+        "text": "Gives Downtown's revenue for the year as about {downtown_revenue} (anything from {downtown_revenue_lo} to {downtown_revenue_hi} counts)."
+      }
     ]
   },
   {
     "id": "weekend-leader",
-    "tags": ["pattern"],
+    "tags": [
+      "pattern"
+    ],
     "question": "Which store does the most business on weekends?",
     "criteria": [
-      {"id": "riverside", "text": "Names Riverside as the store with the most weekend business."}
+      {
+        "id": "riverside",
+        "text": "Names Riverside as the store with the most weekend business."
+      }
     ]
   },
   {
     "id": "downtown-weekends",
-    "tags": ["pattern"],
+    "tags": [
+      "pattern"
+    ],
     "question": "How do weekends compare with weekdays at the Downtown store?",
     "criteria": [
-      {"id": "quieter", "text": "Says Downtown is much quieter on weekends than on weekdays."},
-      {"id": "per_day", "text": "Puts the weekend drop at roughly 50% to 70% per day (actual: revenue per day falls from {downtown_weekday_per_day} on weekdays to {downtown_weekend_per_day} on weekends, {downtown_weekend_drop} lower). Comparing weekend totals with weekday totals without adjusting for the number of days doesn't count."}
+      {
+        "id": "quieter",
+        "text": "Says Downtown is much quieter on weekends than on weekdays."
+      },
+      {
+        "id": "per_day",
+        "text": "Puts the weekend drop at roughly 50% to 70% per day (actual: revenue per day falls from {downtown_weekday_per_day} on weekdays to {downtown_weekend_per_day} on weekends, {downtown_weekend_drop} lower). Comparing weekend totals with weekday totals without adjusting for the number of days doesn't count."
+      }
     ]
   },
   {
     "id": "seasonal-store",
-    "tags": ["pattern"],
+    "tags": [
+      "pattern"
+    ],
     "question": "Which store's sales change the most across the year, and when is it quietest?",
     "criteria": [
-      {"id": "campus", "text": "Names Campus as the store whose sales vary most through the year."},
-      {"id": "summer", "text": "Says Campus is quietest in the summer months (June to August)."}
+      {
+        "id": "campus",
+        "text": "Names Campus as the store whose sales vary most through the year."
+      },
+      {
+        "id": "summer",
+        "text": "Says Campus is quietest in the summer months (June to August)."
+      }
     ]
   },
   {
     "id": "iced-season",
-    "tags": ["pattern"],
+    "tags": [
+      "pattern"
+    ],
     "question": "When do iced drinks sell best, and how does that compare with their slowest month?",
     "criteria": [
-      {"id": "peak", "text": "Names July as the best month for iced drinks (Cold Brew and Iced Latte)."},
-      {"id": "low", "text": "Names {iced_low} as the slowest month ({iced_low_detail})."},
-      {"id": "ratio", "text": "Says July sales are about {iced_ratio} times the slowest month's (anything from 3.5 to 4.5 times counts)."}
+      {
+        "id": "peak",
+        "text": "Names July as the best month for iced drinks (Cold Brew and Iced Latte)."
+      },
+      {
+        "id": "low",
+        "text": "Names {iced_low} as the slowest month ({iced_low_detail})."
+      },
+      {
+        "id": "ratio",
+        "text": "Says July sales are about {iced_ratio} times the slowest month's (anything from 3.5 to 4.5 times counts)."
+      }
     ]
   },
   {
     "id": "price-increase",
-    "tags": ["pattern", "trap"],
+    "tags": [
+      "pattern",
+      "trap"
+    ],
     "question": "Did the April price increase hurt latte sales?",
     "criteria": [
-      {"id": "control", "text": "Compares lattes with drinks whose price didn't change (for example espresso, which fell {espresso_drop} over the same months), or otherwise accounts for the seasonal shift from hot to iced drinks."},
-      {"id": "not_all_price", "text": "Doesn't blame the whole raw drop in latte sales (about {latte_drop}, Oct-Mar vs Apr-Sep) on the price increase: concludes that the price effect is smaller than the raw drop."}
+      {
+        "id": "control",
+        "text": "Compares lattes with drinks whose price didn't change (for example espresso, which fell {espresso_drop} over the same months), or otherwise accounts for the seasonal shift from hot to iced drinks."
+      },
+      {
+        "id": "not_all_price",
+        "text": "Doesn't blame the whole raw drop in latte sales (about {latte_drop}, Oct-Mar vs Apr-Sep) on the price increase: concludes that the price effect is smaller than the raw drop."
+      }
     ]
   },
   {
     "id": "matcha-launch",
-    "tags": ["pattern"],
+    "tags": [
+      "pattern"
+    ],
     "question": "When did the Matcha Latte go on sale?",
     "criteria": [
-      {"id": "date", "text": "Says the Matcha Latte was first sold on {matcha_launch}."}
+      {
+        "id": "date",
+        "text": "Says the Matcha Latte was first sold on {matcha_launch}."
+      }
     ]
   },
   {
     "id": "product-averages",
-    "tags": ["pattern", "trap"],
+    "tags": [
+      "pattern",
+      "trap"
+    ],
     "question": "What is the average monthly revenue of each product?",
     "criteria": [
-      {"id": "matcha_months", "text": "Accounts for the Matcha Latte only being on sale from March 2026: either averages it over its months on sale (about {matcha_avg_on_sale} a month) or clearly says that a 12-month average (about {matcha_avg_12}) understates it. If it gives a months-on-sale average, that figure must be about {matcha_avg_on_sale} (anything from {matcha_avg_on_sale_lo} to {matcha_avg_on_sale_hi} counts)."},
-      {"id": "matcha_rank", "text": "If it says where the Matcha Latte ranks on its months-on-sale average, the ranking is right: above Espresso (about {espresso_avg} a month) and below Muffin (about {muffin_avg}). An answer that doesn't rank it on that basis meets this check."}
+      {
+        "id": "matcha_months",
+        "text": "Accounts for the Matcha Latte only being on sale from March 2026: either averages it over its months on sale (about {matcha_avg_on_sale} a month) or clearly says that a 12-month average (about {matcha_avg_12}) understates it. If it gives a months-on-sale average, that figure must be about {matcha_avg_on_sale} (anything from {matcha_avg_on_sale_lo} to {matcha_avg_on_sale_hi} counts)."
+      },
+      {
+        "id": "matcha_rank",
+        "text": "If it says where the Matcha Latte ranks on its months-on-sale average, the ranking is right: above Espresso (about {espresso_avg} a month) and below Muffin (about {muffin_avg}). An answer that doesn't rank it on that basis meets this check."
+      }
     ]
   },
   {
     "id": "busiest-hours",
-    "tags": ["pattern"],
+    "tags": [
+      "pattern"
+    ],
     "question": "Which hour of the day gets the most orders at each store?",
     "criteria": [
-      {"id": "downtown", "text": "Downtown: the 8am hour (8:00 to 8:59)."},
-      {"id": "riverside", "text": "Riverside: the 11am hour."},
-      {"id": "campus", "text": "Campus: the 11am hour."}
+      {
+        "id": "downtown",
+        "text": "Downtown: the 8am hour (8:00 to 8:59)."
+      },
+      {
+        "id": "riverside",
+        "text": "Riverside: the 11am hour."
+      },
+      {
+        "id": "campus",
+        "text": "Campus: the 11am hour."
+      }
     ]
   },
   {
     "id": "total-revenue",
-    "tags": ["data-quality"],
+    "tags": [
+      "data-quality"
+    ],
     "question": "What was the chain's total revenue for the year?",
     "criteria": [
-      {"id": "total", "text": "Reports net revenue of about {total_net} (anything from {total_lo} to {total_hi} counts), or reports gross sales of about {total_gross} with refunds of about {refunds_total} stated separately. Not removing duplicate rows gives {total_no_dedupe}, which doesn't count."}
+      {
+        "id": "total",
+        "text": "Reports net revenue of about {total_net} (anything from {total_lo} to {total_hi} counts), or reports gross sales of about {total_gross} with refunds of about {refunds_total} stated separately. Not removing duplicate rows gives {total_no_dedupe}, which doesn't count."
+      }
     ]
   },
   {
     "id": "product-count",
-    "tags": ["data-quality"],
+    "tags": [
+      "data-quality"
+    ],
     "question": "How many different products does the shop sell?",
     "criteria": [
-      {"id": "eight", "text": "Says {products} products: Espresso, Latte, Cappuccino, Cold Brew, Iced Latte, Matcha Latte, Croissant and Muffin. The raw product column has {raw_spellings} spellings; an answer of {raw_spellings} doesn't count."}
+      {
+        "id": "eight",
+        "text": "Says {products} products: Espresso, Latte, Cappuccino, Cold Brew, Iced Latte, Matcha Latte, Croissant and Muffin. The raw product column has {raw_spellings} spellings; an answer of {raw_spellings} doesn't count."
+      }
     ]
   },
   {
     "id": "latte-units",
-    "tags": ["data-quality"],
+    "tags": [
+      "data-quality"
+    ],
     "question": "How many lattes did we sell over the year?",
     "criteria": [
-      {"id": "units", "text": "Gives about {latte_units} lattes (anything from {latte_lo} to {latte_hi} counts). Iced Lattes and Matcha Lattes are separate products and aren't included. Missing the lowercase and uppercase spellings gives about {latte_no_norm}, which doesn't count."}
+      {
+        "id": "units",
+        "text": "Gives about {latte_units} lattes (anything from {latte_lo} to {latte_hi} counts). Iced Lattes and Matcha Lattes are separate products and aren't included. Missing the lowercase and uppercase spellings gives about {latte_no_norm}, which doesn't count."
+      }
     ]
   },
   {
     "id": "missing-store",
-    "tags": ["data-quality"],
+    "tags": [
+      "data-quality"
+    ],
     "question": "How much revenue isn't linked to any store?",
     "criteria": [
-      {"id": "amount", "text": "Gives about {missing_rev} across {missing_rows} rows with no store (within 2%). If it first recovers the store from other lines of the same order, about {missing_rev_after_fill} across {missing_rows_after_fill} rows also counts, as long as it says it did that."}
+      {
+        "id": "amount",
+        "text": "Gives about {missing_rev} across {missing_rows} rows with no store (within 2%). If it first recovers the store from other lines of the same order, about {missing_rev_after_fill} across {missing_rows_after_fill} rows also counts, as long as it says it did that."
+      }
     ]
   },
   {
     "id": "refunds",
-    "tags": ["data-quality"],
+    "tags": [
+      "data-quality"
+    ],
     "question": "How much money did we refund during the year?",
     "criteria": [
-      {"id": "amount", "text": "Gives refunds of about {refunds_total} (anything from {refunds_lo} to {refunds_hi} counts)."}
+      {
+        "id": "amount",
+        "text": "Gives refunds of about {refunds_total} (anything from {refunds_lo} to {refunds_hi} counts)."
+      }
     ]
   },
   {
     "id": "data-problems",
-    "tags": ["data-quality"],
+    "tags": [
+      "data-quality"
+    ],
     "question": "Before I use this data, are there any quality problems I should know about?",
     "criteria": [
-      {"id": "duplicates", "text": "Mentions duplicate rows (there are {duplicates})."},
-      {"id": "prices", "text": "Mentions that prices are stored as text with a dollar sign."},
-      {"id": "names", "text": "Mentions inconsistent product name spellings (capitalization or trailing spaces)."},
-      {"id": "missing_store", "text": "Mentions rows with no store."},
-      {"id": "refunds", "text": "Mentions negative quantities (refunds)."}
+      {
+        "id": "duplicates",
+        "text": "Mentions duplicate rows (there are {duplicates})."
+      },
+      {
+        "id": "prices",
+        "text": "Mentions that prices are stored as text with a dollar sign."
+      },
+      {
+        "id": "names",
+        "text": "Mentions inconsistent product name spellings (capitalization or trailing spaces)."
+      },
+      {
+        "id": "missing_store",
+        "text": "Mentions rows with no store."
+      },
+      {
+        "id": "refunds",
+        "text": "Mentions negative quantities (refunds)."
+      }
     ]
   },
   {
     "id": "profit-margin",
-    "tags": ["unanswerable"],
+    "tags": [
+      "unanswerable"
+    ],
     "question": "What's our profit margin on lattes?",
     "criteria": [
-      {"id": "says_missing", "text": "Says the data has no cost information, so the profit margin can't be calculated from it."},
-      {"id": "no_made_up", "text": "Doesn't present a profit margin as if it came from the data. Clearly labelled hypothetical assumptions are fine."}
+      {
+        "id": "says_missing",
+        "text": "Says the data has no cost information, so the profit margin can't be calculated from it."
+      },
+      {
+        "id": "no_made_up",
+        "text": "Doesn't present a profit margin as if it came from the data. Clearly labelled hypothetical assumptions are fine."
+      }
     ]
   },
   {
     "id": "customer-age",
-    "tags": ["unanswerable"],
+    "tags": [
+      "unanswerable"
+    ],
     "question": "What's the average age of our loyalty members?",
     "criteria": [
-      {"id": "says_missing", "text": "Says the data has no age information."},
-      {"id": "no_made_up", "text": "Doesn't give an average age."}
+      {
+        "id": "says_missing",
+        "text": "Says the data has no age information."
+      },
+      {
+        "id": "no_made_up",
+        "text": "Doesn't give an average age."
+      }
+    ]
+  },
+  {
+    "id": "latte-price",
+    "tags": [
+      "held-out",
+      "trap"
+    ],
+    "question": "What was the average price of a latte over the year?",
+    "criteria": [
+      {
+        "id": "change",
+        "text": "Mentions that the latte price changed during the year, from $4.75 to $5.25 in April."
+      },
+      {
+        "id": "average",
+        "text": "Gives an average weighted by lattes sold of about {latte_avg_price} (anything from {latte_price_lo} to {latte_price_hi} counts). Averaging the two prices to get $5.00 doesn't count."
+      }
+    ]
+  },
+  {
+    "id": "order-value",
+    "tags": [
+      "held-out",
+      "trap"
+    ],
+    "question": "What's the average order value?",
+    "criteria": [
+      {
+        "id": "per_order",
+        "text": "Gives about {avg_order_value} per order (anything from {aov_lo} to {aov_hi} counts), adding up all the lines of each order. The average per line item, about {avg_line_value}, doesn't count."
+      }
+    ]
+  },
+  {
+    "id": "food-orders",
+    "tags": [
+      "held-out",
+      "trap"
+    ],
+    "question": "What share of orders include food (a croissant or muffin)?",
+    "criteria": [
+      {
+        "id": "share",
+        "text": "Gives about {food_order_share} of orders (anything from {food_lo} to {food_hi} counts). The share of line items that are food, about {food_line_share}, doesn't count."
+      }
+    ]
+  },
+  {
+    "id": "loyal-cash",
+    "tags": [
+      "held-out",
+      "trap"
+    ],
+    "question": "What share of loyalty members' orders are paid in cash?",
+    "criteria": [
+      {
+        "id": "share",
+        "text": "Gives about {cash_among_loyal} (anything from {cash_lo} to {cash_hi} counts). The share of cash orders that come from loyalty members, about {loyal_among_cash}, answers a different question and doesn't count."
+      }
+    ]
+  },
+  {
+    "id": "half-year-growth",
+    "tags": [
+      "held-out",
+      "trap"
+    ],
+    "question": "Which product's sales grew the most from the first half of the year (October to March) to the second half (April to September)?",
+    "criteria": [
+      {
+        "id": "matcha_caveat",
+        "text": "Doesn't present the Matcha Latte's growth (about {matcha_growth} in units) as a like-for-like result: either leaves it out or says it's inflated because the Matcha only went on sale in March 2026."
+      },
+      {
+        "id": "top_full_year",
+        "text": "Among products sold all year, names Iced Latte or Cold Brew as growing the most and makes clear which measure it means. Iced Latte gained the most revenue (about {iced_latte_gain}, {iced_latte_growth}); Cold Brew grew the most in percentage terms (about {cold_brew_growth}, {cold_brew_gain}); in units the two are about even."
+      }
     ]
   }
 ]

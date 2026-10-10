@@ -34,6 +34,11 @@ CORRECT = {
     "data-problems": "Yes. There are {duplicates} duplicate rows, prices are stored as text like \"$4.75\", product names are spelled inconsistently (different capitalization and trailing spaces), {missing_rows} rows have no store, and refunds appear as negative quantities.",
     "profit-margin": "The data has no cost information, only sale prices, so the profit margin on lattes can't be calculated from it.",
     "customer-age": "The data has no information about customers' ages, so I can't work out the average age of loyalty members.",
+    "latte-price": "The latte price went from $4.75 to $5.25 on 1 April 2026. Weighted by lattes sold, the average price for the year was {latte_avg_price}.",
+    "order-value": "The average order value was {avg_order_value}, adding up all the lines of each order.",
+    "food-orders": "{food_order_share} of orders include a croissant or muffin.",
+    "loyal-cash": "{cash_among_loyal} of loyalty members' orders are paid in cash.",
+    "half-year-growth": "Among products sold all year, Cold Brew grew the most: {cold_brew_growth} in units, ahead of Iced Latte at {iced_latte_growth}. The Matcha Latte shows {matcha_growth}, but that's inflated because it only went on sale in March 2026.",
 }
 BAD_SAMPLE = ["top-store", "price-increase", "total-revenue", "product-averages", "customer-age"]
 # Plausible answers with one specific mistake each, taken from real agent runs. All should fail.
@@ -44,6 +49,12 @@ SUBTLE_MISTAKES = [
     ("product-averages", "- Matcha Latte: {matcha_avg_12} over 12 months, or $1,031 over its 7 selling months\n\n"
      "Matcha Latte has no sales from Oct 2025 to Feb 2026, so it looks like it launched in March 2026. "
      "I counted those months as $0 in the {matcha_avg_12} figure. If you only want the months it was on sale, use $1,031."),  # wrong figure
+    # The trap each held-out question sets
+    ("latte-price", "The average latte price was $5.00: it was $4.75 until April and $5.25 after."),
+    ("order-value", "The average order value is {avg_line_value}."),
+    ("food-orders", "{food_line_share} of orders include food."),
+    ("loyal-cash", "{loyal_among_cash} of loyalty members' orders are paid in cash."),
+    ("half-year-growth", "The Matcha Latte grew the most, up {matcha_growth} from the first half of the year to the second."),
 ]
 
 
