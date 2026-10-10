@@ -1,5 +1,7 @@
 # Data Analyst Agent
 
+[![tests](https://github.com/adityakannan-2003/data-analyst-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/adityakannan-2003/data-analyst-agent/actions/workflows/tests.yml)
+
 Ask questions about any CSV file in plain English. The agent writes pandas code, runs it, reads the output, fixes its own errors, and draws charts. Every number in its answer comes from code it actually ran.
 
 It's built directly on the Claude API. The agent loop is written by hand in about 70 lines (`Agent.ask` in [agent.py](agent.py)), with no agent framework.
@@ -96,7 +98,7 @@ Options:
 uv run pytest
 ```
 
-No API key needed. The sandbox tests run real code. The agent-loop tests replace the API with a fake client that returns scripted model turns: tool calls, parallel calls, malformed input, cut-off input, charts, and refusals.
+No API key needed, so they also run on GitHub on every push. The sandbox tests run real code. The agent-loop tests replace the API with a fake client that returns scripted model turns: tool calls, parallel calls, malformed input, cut-off input, charts, and refusals.
 
 ## Evaluation
 
