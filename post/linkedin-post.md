@@ -76,3 +76,50 @@ The real data is the UCI Online Retail dataset (Chen, 2015, CC BY 4.0). A script
    the first hour.
 
 Every number in the post comes from the README and the saved eval results in the repo.
+
+---
+
+## Project description (detailed)
+
+For a portfolio page, a CV, or the description of a GitHub or LinkedIn project.
+
+**Data Analyst Agent: ask questions about any CSV in plain English**
+
+An AI agent that answers questions about spreadsheet data. You ask something like "Which product sold the most units?", and the agent writes pandas code, runs it, reads the output and fixes its own errors until it can answer. It draws charts when they help and looks at each chart it draws to check it's readable. Every number in an answer comes from code the agent actually ran.
+
+*How it's built*
+
+- **A hand-written agent loop.** About 70 lines of Python on the Claude API, with no agent framework. The loop sends the question to the model, runs every tool call in the response, returns all the results in one message, and stops when the model answers. It handles refusals, tool input cut off at the output limit, malformed tool input, a cap on steps, and rolling back the conversation after an error or Ctrl+C.
+- **Two tools.** `run_python` runs code against the data, and `save_chart` draws a chart and sends the image back to the model.
+- **A sandbox with persistent state.** Code runs in a separate process that keeps its variables between calls, like notebook cells. If code hangs, the process is restarted after 60 seconds. Errors are trimmed to the agent's own lines so it can see what to fix.
+- **Context up front.** The system prompt includes a profile of the data: column types, missing values, distinct counts and examples. That saves a tool call on every question.
+- **Default model chosen by evidence.** Claude Sonnet 5.5, picked after the eval below showed it matched Claude Opus 5.5 at about half the cost.
+
+*How it's tested*
+
+- **Two evals, 37 questions.** One uses a made-up coffee-chain dataset (33,237 rows) with planted patterns and planted data problems, so every answer is known: 22 questions, including 5 held back until after the last prompt change. The other uses the real UCI Online Retail dataset: 541,909 transactions from a UK online shop, with 15 questions.
+- **Answer keys computed from the data, never typed in.** Where a fair cleaning choice changes the answer, such as before or after cancellations, or product name vs. stock code, the check accepts each fair reading as long as the answer says which it used.
+- **A model as grader, and a test of the grader.** Claude Sonnet 5.5 grades each answer against concrete checks, using structured output. A separate script confirms that correct answers pass and that wrong ones fail: empty answers, "I don't know", answers to a different question, and the real mistakes agents made.
+- **A careful runner.** Repeated runs, resume after a crash, a time limit per question, failed runs kept out of the score, a check that the expected model answered, and re-grading saved answers after a check changes.
+- **Code tests.** 16 unit tests, including a fake model client that drives the agent loop with no API key. They run on GitHub Actions on every push.
+
+*Results*
+
+- **Real data:** 15 of 15 questions passed on every run, at $0.017 and about 9 seconds per answer. The agent avoided every trap: a cancelled 80,995-unit order posing as the best seller, postage posing as the top product, a month with 9 days of data posing as the weakest, and Saturday sales that don't exist.
+- **Made-up data:** 22 of 22 passed on every run.
+- **Model comparison:** Sonnet 5.5 needed one prompt line to match Opus 5.5, about averaging products that weren't on sale for the whole period. After that it matched Opus at about half the cost and 40% faster. Re-grading Sonnet's answers with Opus as the grader agreed on 63 of 64 checks.
+- **What the evals taught:** 3 of the 4 failures I investigated were bugs in my answer key, not the agent. The grader was also too lenient twice, and both cases are now regression tests.
+
+*Tools:* Python, Claude API (Anthropic SDK), pandas, matplotlib, Pillow, pytest, uv, GitHub Actions.
+
+*Code:* https://github.com/adityakannan-2003/data-analyst-agent
+
+---
+
+## Plain-English summary
+
+I built a program you can ask questions about a spreadsheet in everyday language, like "Which product sold the most?". It answers by working the numbers out itself, using an AI model (Claude) that writes and runs small pieces of code, rather than guessing.
+
+To check it really works, I gave it two exams. One used made-up sales data where I knew every answer. The other used more than half a million real sales records from a UK online shop, full of the mess real data has: cancelled orders, missing customer details and shipping charges mixed in with products. It passed every question on both, and it spotted the traps, like a huge order that looked like the best seller but was cancelled minutes later.
+
+The exams also showed that a cheaper AI model did as well as the expensive one, so the program now uses the cheaper one. And when the AI seemed to get something wrong, it was usually my answer sheet that was wrong, not the AI.
