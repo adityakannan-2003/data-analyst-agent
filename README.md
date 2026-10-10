@@ -14,6 +14,17 @@ An earlier run on Opus 5.5 drew this chart for the same question, with each drin
 
 ![Monthly units for latte, cappuccino, espresso and iced drinks. After April, latte and cappuccino fall below espresso](docs/price-increase-chart.png)
 
+## Results
+
+Two evals check the agent's answers automatically, one on real data and one on made-up data with planted traps. Details are under [Evaluation](#evaluation).
+
+| | Real data: UK online retailer | Made-up data: coffee chain |
+|---|---|---|
+| Data | 541,909 real transactions | 33,237 sales lines |
+| Questions | 15 | 22 |
+| Passed on every run (Sonnet 5.5) | 15 of 15 | 22 of 22 |
+| Cost / time per answer | $0.017 / 9 s | $0.02 / 10 s |
+
 ## How it works
 
 ```
@@ -64,6 +75,35 @@ Questions to try:
 
 ## On real data
 
+The agent has been tried on two real datasets.
+
+### A UK online retailer
+
+The [UCI Online Retail](https://doi.org/10.24432/C5BW33) dataset has 541,909 real transactions from a UK online gift shop, 1 December 2010 to 9 December 2011 (Chen, 2015, CC BY 4.0). It's too big to keep in the repo, so a script downloads it:
+
+```bash
+uv run python scripts/fetch_online_retail.py
+```
+
+It's messy in all the ways real exports are:
+
+- 3,836 cancelled orders, including one for 80,995 paper crafts that was cancelled 12 minutes later
+- a quarter of rows with no customer ID
+- 5,268 duplicate rows, and lines with zero or negative prices
+- postage, Amazon fees, discounts and manual adjustments mixed in with the products
+- a last month that stops on 9 December, and no Saturday sales at all
+
+Those make good traps:
+
+- **Best-selling product:** the obvious answer is the cancelled order.
+- **Top revenue product:** the obvious answer is postage.
+- **Weakest month:** the obvious answer is the one with only 9 days of data.
+- **Saturday sales:** there aren't any.
+
+The agent avoided all of them: **15 of 15 questions passed on both runs**, at $0.017 and 9 seconds per answer. The questions and results are under [Real-data eval](#real-data-eval).
+
+### Stock prices
+
 [data/stocks.csv](data/stocks.csv) is real: monthly prices for eight companies, the S&P 500 and the Nasdaq from 1990 to 2022, from Yahoo Finance. The file ships with matplotlib as sample data. It's messy in ways the coffee data isn't:
 
 - a comment line before the header
@@ -111,6 +151,8 @@ Or ask one question and exit:
 uv run python agent.py data/coffee_sales.csv -q "Which store makes the most revenue?"
 ```
 
+To use the real retail data, download it first with `uv run python scripts/fetch_online_retail.py`, then run the agent on `data/online_retail.csv`.
+
 Options:
 
 - `--model`: defaults to `claude-sonnet-5-5`, which passes every eval question at under half the cost of `claude-opus-5-5`. Opus is the more careful choice: it passed every question even before the prompt fix described under Evaluation.
@@ -127,7 +169,11 @@ No API key needed, so they also run on GitHub on every push. The sandbox tests r
 
 ## Evaluation
 
-The tests check the code; the eval checks the answers. [evals/cases.json](evals/cases.json) has 22 questions:
+The tests check the code; the evals check the answers. There are two, called suites: one on made-up data, where every answer is planted, and one on real data.
+
+### Made-up data
+
+[evals/cases.json](evals/cases.json) has 22 questions about the coffee chain:
 
 - 9 about the planted patterns, including the two traps
 - 6 that only come out right if the data is cleaned first
@@ -173,16 +219,54 @@ That runs every question twice on the default model: about $1.05 with Sonnet, in
 - `--variant v4 --model claude-opus-5-5` saves results for a different setup next to the others. Each variant holds one model's results; the runner refuses to mix them.
 - `--regrade` re-grades saved answers after you change a check, without running the agent again.
 
-The grader is tested too. `evals/check_judge.py` confirms that correct answers pass and bad ones fail: empty, "I don't know", an answer to a different question, two subtle mistakes the agent really made, and the trap answer for each held-out question. It costs about $0.11.
+### Real-data eval
+
+[evals/retail_cases.json](evals/retail_cases.json) has 15 questions about the retail data:
+
+- 8 about patterns, including four traps
+- 5 that only come out right if the data is cleaned first
+- 2 the data can't answer (profit margin, website conversion rate)
+
+[evals/retail_key.py](evals/retail_key.py) computes the expected values from the data.
+
+Real data has no planted answers, and some questions have more than one fair answer. "Revenue" can be before or after cancellations, and a "product" can be a name or a stock code. So where a fair choice changes the answer, the check accepts each fair reading, as long as the answer says which one it used.
+
+**Result: all 15 questions pass on both runs** with Sonnet 5.5, at $0.017 and 9 seconds per answer. Every answer and grade is in [results.jsonl](.claude/hillclimb/retail-answers/baseline/results.jsonl).
+
+```bash
+uv run python evals/run_eval.py --suite retail
+```
+
+That costs about $0.60, including grading.
+
+### Testing the grader
+
+The grader is tested too. `evals/check_judge.py` confirms that correct answers pass and bad ones fail:
+
+- an empty answer
+- "I don't know"
+- an answer to a different question
+- two subtle mistakes the agent really made
+- the trap answer for each held-out and real-data question
+
+It costs about $0.10 per suite.
 
 ```bash
 uv run python evals/check_judge.py
 ```
 
-Building the eval caught problems on both sides:
+```bash
+uv run python evals/check_judge.py --suite retail
+```
+
+### What building the evals caught
+
+Problems turned up on both sides of the grading:
 
 - **A grader that was too lenient, twice.** It passed an answer that gave the right Matcha Latte figure and then ranked it wrongly. Later it passed one that gave the wrong figure, because the answer said the 12-month average understated the Matcha. Both are checked now, and both answers are kept in `check_judge.py` as tests.
-- **A wrong answer key, twice.** The first full run failed the agent for calling February the slowest month for iced drinks, but January and February are tied (309 units each). Later, both models failed the held-out growth question on every run, because the key assumed "grew the most" meant percentage. Iced Latte wins in dollars and Cold Brew in percentage, and every answer covered both. Both keys now accept either reading. Reading failures before trusting them is what found these.
+- **A wrong answer key, three times.** The first full run failed the agent for calling February the slowest month for iced drinks, but January and February are tied (309 units each). Later, both models failed the held-out growth question on every run, because the key assumed "grew the most" meant percentage. Iced Latte wins in dollars and Cold Brew in percentage, and every answer covered both. On the real data, the agent "failed" the best-seller question on both runs, because it grouped by stock code and my key grouped by name. One stock code is sold under two names ("POPCORN HOLDER" and "SMALL POPCORN HOLDER"), so it's the top seller one way and not the other. All three keys now accept either reading.
+
+Across both evals, 3 of the 4 failures I investigated were bugs in my answer key, not the agent. Reading failures before trusting the score is what found them.
 
 ## Recording the demo
 

@@ -1,0 +1,246 @@
+[
+  {
+    "id": "best-month",
+    "tags": [
+      "pattern"
+    ],
+    "question": "Which month had the highest sales?",
+    "criteria": [
+      {
+        "id": "month",
+        "text": "Names {best_month} as the best month (about {best_month_net} after cancellations, or {best_month_sales} before)."
+      }
+    ]
+  },
+  {
+    "id": "weakest-month",
+    "tags": [
+      "pattern",
+      "trap"
+    ],
+    "question": "Which month had the lowest sales?",
+    "criteria": [
+      {
+        "id": "partial",
+        "text": "Doesn't present {partial_month} as the weakest month without saying it's incomplete: the data ends on {last_day}."
+      },
+      {
+        "id": "full_month",
+        "text": "Names the weakest full month as {weakest_full_net} (after subtracting cancellations) or {weakest_full_sales} (before), and the answer makes clear which it means if that matters."
+      }
+    ]
+  },
+  {
+    "id": "weekdays",
+    "tags": [
+      "pattern",
+      "trap"
+    ],
+    "question": "Which day of the week brings in the most sales, and how does Saturday compare?",
+    "criteria": [
+      {
+        "id": "best_day",
+        "text": "Names {best_weekday} as the day with the most sales."
+      },
+      {
+        "id": "saturday",
+        "text": "Says there are no Saturday sales in the data at all (the file has {saturday_rows} Saturday rows), rather than giving Saturday a figure or ranking it."
+      }
+    ]
+  },
+  {
+    "id": "top-country",
+    "tags": [
+      "pattern"
+    ],
+    "question": "Which country outside the UK brings in the most revenue?",
+    "criteria": [
+      {
+        "id": "country",
+        "text": "Names the {top_country} (about {top_country_revenue})."
+      }
+    ]
+  },
+  {
+    "id": "uk-share",
+    "tags": [
+      "pattern"
+    ],
+    "question": "What share of revenue comes from the UK?",
+    "criteria": [
+      {
+        "id": "share",
+        "text": "Gives about {uk_share} (anything from {uk_share_lo} to {uk_share_hi} counts)."
+      }
+    ]
+  },
+  {
+    "id": "top-units",
+    "tags": [
+      "pattern",
+      "trap"
+    ],
+    "question": "Which product sold the most units?",
+    "criteria": [
+      {
+        "id": "product",
+        "text": "Names the top product and makes clear how products are grouped. Grouping by product name, it's {top_units_product} (about {top_units} units after cancellations, or {top_units_gross} before). Grouping by stock code, it's {top_units_code_product} (about {top_units_code} units), because that code is sold under two names. Either counts."
+      },
+      {
+        "id": "not_cancelled",
+        "text": "Doesn't name {trap_units_product} as the top seller. Its {trap_units} units were a single order that was cancelled the same day."
+      }
+    ]
+  },
+  {
+    "id": "top-revenue-product",
+    "tags": [
+      "pattern",
+      "trap"
+    ],
+    "question": "Which product brought in the most revenue?",
+    "criteria": [
+      {
+        "id": "product",
+        "text": "Names {top_revenue_product} (about {top_revenue} after cancellations, or {top_revenue_gross} before)."
+      },
+      {
+        "id": "not_postage",
+        "text": "Doesn't present DOTCOM POSTAGE ({postage_revenue}) as the top product. It's a postage charge, not a product; mentioning it as a non-product line is fine."
+      }
+    ]
+  },
+  {
+    "id": "repeat-customers",
+    "tags": [
+      "pattern"
+    ],
+    "question": "What share of customers ordered more than once?",
+    "criteria": [
+      {
+        "id": "share",
+        "text": "Gives about {repeat_share} of customers with a customer ID (anything from {repeat_lo} to {repeat_hi} counts), counting distinct orders that weren't cancelled."
+      }
+    ]
+  },
+  {
+    "id": "total-revenue",
+    "tags": [
+      "data-quality"
+    ],
+    "question": "What was the shop's total revenue over the whole period?",
+    "criteria": [
+      {
+        "id": "total",
+        "text": "Reports revenue after cancellations of about {total_net} (anything from {total_lo} to {total_hi} counts), or gross sales of about {total_gross} with cancellations of about {cancelled_value} stated separately. Gross sales alone, as if nothing was cancelled, doesn't count."
+      }
+    ]
+  },
+  {
+    "id": "customers",
+    "tags": [
+      "data-quality"
+    ],
+    "question": "How many customers does the shop have?",
+    "criteria": [
+      {
+        "id": "count",
+        "text": "Gives about {customers} customers who bought something ({customers_any} if it also counts customers who only cancelled)."
+      },
+      {
+        "id": "missing_ids",
+        "text": "Says that about {missing_id_share} of rows have no customer ID, so the real number of customers is likely higher."
+      }
+    ]
+  },
+  {
+    "id": "order-value",
+    "tags": [
+      "data-quality",
+      "trap"
+    ],
+    "question": "What's the average order value?",
+    "criteria": [
+      {
+        "id": "per_order",
+        "text": "Gives an average per order (adding up each invoice's lines, leaving out cancellations) between {aov_lo} and {aov_hi}: about {aov} over all orders, or {aov_with_id} counting only orders with a customer ID. A clearly labelled median of about {aov_median} also counts. The average per line item, about {line_value}, doesn't."
+      }
+    ]
+  },
+  {
+    "id": "cancellations",
+    "tags": [
+      "data-quality"
+    ],
+    "question": "How many orders were cancelled?",
+    "criteria": [
+      {
+        "id": "orders",
+        "text": "Gives about {cancelled_orders} cancelled orders (invoices starting with \"C\"), about {cancelled_share} of all invoices. Counting the {cancelled_lines} cancelled line items as orders doesn't count."
+      }
+    ]
+  },
+  {
+    "id": "data-problems",
+    "tags": [
+      "data-quality"
+    ],
+    "question": "Before I use this data, are there any quality problems I should know about?",
+    "criteria": [
+      {
+        "id": "cancellations",
+        "text": "Mentions cancelled orders or negative quantities."
+      },
+      {
+        "id": "missing_ids",
+        "text": "Mentions rows with no customer ID (about {missing_id_share})."
+      },
+      {
+        "id": "duplicates",
+        "text": "Mentions duplicate rows (there are {duplicates})."
+      },
+      {
+        "id": "non_products",
+        "text": "Mentions lines that aren't products, such as postage, fees, discounts or manual adjustments."
+      },
+      {
+        "id": "prices",
+        "text": "Mentions zero or negative prices ({zero_price_lines} lines)."
+      }
+    ]
+  },
+  {
+    "id": "profit-margin",
+    "tags": [
+      "unanswerable"
+    ],
+    "question": "What's our profit margin on the Regency cakestand?",
+    "criteria": [
+      {
+        "id": "says_missing",
+        "text": "Says the data has no cost information, so the profit margin can't be calculated from it."
+      },
+      {
+        "id": "no_made_up",
+        "text": "Doesn't present a profit margin as if it came from the data. Clearly labelled hypothetical assumptions are fine."
+      }
+    ]
+  },
+  {
+    "id": "conversion-rate",
+    "tags": [
+      "unanswerable"
+    ],
+    "question": "What's the website's conversion rate?",
+    "criteria": [
+      {
+        "id": "says_missing",
+        "text": "Says the data has no visitor or traffic information, so the conversion rate can't be calculated from it."
+      },
+      {
+        "id": "no_made_up",
+        "text": "Doesn't give a conversion rate as if it came from the data."
+      }
+    ]
+  }
+]

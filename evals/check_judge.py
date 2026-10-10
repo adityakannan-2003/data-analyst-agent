@@ -1,22 +1,24 @@
 """Check the judge before trusting it: correct answers must pass and bad answers must fail.
 
-    uv run python evals/check_judge.py
+    uv run python evals/check_judge.py                  # the coffee eval
+    uv run python evals/check_judge.py --suite retail   # the real-data eval
 
 For every case, a hand-written correct answer (filled with the answer key's values) should pass
 all checks. If one fails, the check's wording is broken, not the agent. For a sample of cases,
 three bad answers (empty, "I don't know", and a correct answer to a different question) should
-fail, and so should answers with a specific mistake an agent actually made. Costs about $0.10.
+fail, and so should answers with a specific mistake or trap. Costs about $0.10 per suite.
 """
 
+import argparse
 from concurrent.futures import ThreadPoolExecutor
 
 import anthropic
 from dotenv import load_dotenv
 
-from answer_key import facts
-from run_eval import CSV, JUDGE_MODEL, ROOT, cost, judge, load_cases
+import run_eval
+from run_eval import JUDGE_MODEL, ROOT, cost, judge
 
-CORRECT = {
+COFFEE_CORRECT = {
     "top-store": "Downtown brought in the most revenue: {downtown_revenue} for the year, ahead of Riverside and Campus.",
     "weekend-leader": "Riverside does the most business on weekends, by both revenue and number of orders.",
     "downtown-weekends": "Downtown is much quieter on weekends. Revenue per day falls from {downtown_weekday_per_day} on weekdays to {downtown_weekend_per_day} on weekends, about {downtown_weekend_drop} lower.",
@@ -40,9 +42,9 @@ CORRECT = {
     "loyal-cash": "{cash_among_loyal} of loyalty members' orders are paid in cash.",
     "half-year-growth": "Among products sold all year, Cold Brew grew the most: {cold_brew_growth} in units, ahead of Iced Latte at {iced_latte_growth}. The Matcha Latte shows {matcha_growth}, but that's inflated because it only went on sale in March 2026.",
 }
-BAD_SAMPLE = ["top-store", "price-increase", "total-revenue", "product-averages", "customer-age"]
+COFFEE_BAD_SAMPLE = ["top-store", "price-increase", "total-revenue", "product-averages", "customer-age"]
 # Plausible answers with one specific mistake each, taken from real agent runs. All should fail.
-SUBTLE_MISTAKES = [
+COFFEE_SUBTLE_MISTAKES = [
     ("product-averages", "Matcha Latte brings in the least, about {matcha_avg_12} a month averaged over the full year. "
      "It had no sales before March 2026, so it probably launched then. Averaged over just its 7 months on sale, "
      "it makes about {matcha_avg_on_sale} a month, which would put it just behind Espresso."),  # wrong ranking
@@ -58,10 +60,51 @@ SUBTLE_MISTAKES = [
 ]
 
 
+RETAIL_CORRECT = {
+    "best-month": "{best_month} had the highest sales: {best_month_net} after cancellations.",
+    "weakest-month": "The data ends on {last_day}, so {partial_month} is incomplete and its low total isn't comparable. The weakest full month was {weakest_full_net}, after subtracting cancellations.",
+    "weekdays": "{best_weekday} brings in the most sales. There are no Saturday sales in the data at all, so Saturday can't be compared.",
+    "top-country": "The {top_country} brings in the most revenue outside the UK, about {top_country_revenue}.",
+    "uk-share": "About {uk_share} of revenue comes from the UK.",
+    "top-units": "{top_units_product} sold the most units: {top_units} after cancellations. {trap_units_product} shows {trap_units} units, but that was one order cancelled the same day.",
+    "top-revenue-product": "{top_revenue_product} brought in the most revenue, about {top_revenue} after cancellations. DOTCOM POSTAGE shows {postage_revenue}, but it's a postage charge, not a product.",
+    "repeat-customers": "{repeat_share} of customers with a customer ID ordered more than once, counting orders that weren't cancelled.",
+    "total-revenue": "Total revenue after cancellations was {total_net}: gross sales of {total_gross} minus {cancelled_value} of cancellations, after removing {duplicates} duplicate rows.",
+    "customers": "{customers} customers bought something. About {missing_id_share} of rows have no customer ID, so the real number of customers is likely higher.",
+    "order-value": "The average order value is {aov}, adding up each invoice's lines and leaving out cancellations. The median is {aov_median}.",
+    "cancellations": "{cancelled_orders} orders were cancelled (invoices starting with \"C\"), about {cancelled_share} of all invoices.",
+    "data-problems": "Yes: cancelled orders with negative quantities, about {missing_id_share} of rows with no customer ID, {duplicates} duplicate rows, lines that aren't products (postage, Amazon fees, discounts, manual adjustments), and {zero_price_lines} lines with zero or negative prices.",
+    "profit-margin": "The data has no cost information, only selling prices, so the profit margin on the Regency cakestand can't be calculated from it.",
+    "conversion-rate": "The data only has orders, with no visitor or traffic information, so the website's conversion rate can't be calculated from it.",
+}
+RETAIL_BAD_SAMPLE = ["best-month", "top-units", "total-revenue", "customers", "conversion-rate"]
+# The trap each retail question sets. All should fail.
+RETAIL_SUBTLE_MISTAKES = [
+    ("weakest-month", "{partial_month} had the lowest sales."),
+    ("weekdays", "{best_weekday} brings in the most sales. Saturday is the quietest day."),
+    ("top-units", "{trap_units_product} sold the most units: {trap_units}."),
+    ("top-revenue-product", "DOTCOM POSTAGE brought in the most revenue: {postage_revenue}."),
+    ("total-revenue", "Total revenue was {total_gross}."),
+    ("customers", "The shop has {customers} customers."),
+    ("order-value", "The average order value is {line_value}."),
+    ("cancellations", "{cancelled_lines} orders were cancelled."),
+    ("profit-margin", "The profit margin on the Regency cakestand is about 45%."),
+]
+SUITES = {
+    "coffee": (COFFEE_CORRECT, COFFEE_BAD_SAMPLE, COFFEE_SUBTLE_MISTAKES),
+    "retail": (RETAIL_CORRECT, RETAIL_BAD_SAMPLE, RETAIL_SUBTLE_MISTAKES),
+}
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Check that the judge passes correct answers and fails bad ones.")
+    parser.add_argument("--suite", default="coffee", choices=sorted(SUITES), help="Which eval's checks to test.")
+    suite = parser.parse_args().suite
+    CORRECT, BAD_SAMPLE, SUBTLE_MISTAKES = SUITES[suite]
     load_dotenv(ROOT / ".env")
-    values = facts(CSV)
-    cases = {c["id"]: c for c in load_cases()}
+    run_eval.use_suite(suite)
+    values = run_eval.KEY.facts(run_eval.CSV)
+    cases = {c["id"]: c for c in run_eval.load_cases()}
     correct = {cid: CORRECT[cid].format_map(values) for cid in cases}
     ids = list(cases)
     trials = [(cid, "correct", correct[cid], True) for cid in ids]

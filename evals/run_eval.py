@@ -1,13 +1,16 @@
-"""Run the eval: ask the agent every question in evals/cases.json and grade the answers.
+"""Run the eval: ask the agent every question in a suite and grade the answers.
 
     uv run python evals/run_eval.py                                  # every case, 2 runs each
+    uv run python evals/run_eval.py --suite retail                   # the real-data eval
     uv run python evals/run_eval.py --cases refunds,top-store --reps 1
     uv run python evals/run_eval.py --variant v1 --effort medium     # try a change, compare with baseline
 
-A second model (the judge) grades each answer against the case's checks. Expected values come
-from evals/answer_key.py, which computes them from the data. A case passes when every check does.
+There are two suites. "coffee" (the default) asks evals/cases.json about the made-up coffee chain,
+with expected values from evals/answer_key.py. "retail" asks evals/retail_cases.json about the real
+UCI Online Retail data, with expected values from evals/retail_key.py. A second model (the judge)
+grades each answer against the case's checks, and a case passes when every check does.
 
-Output goes to .claude/hillclimb/analyst-answers/<variant>/:
+Output goes to .claude/hillclimb/<suite folder>/<variant>/:
   results.jsonl              one graded row per (case, run), written as each finishes
   traces/<case>_rep<k>.json  the full conversation, to see why a case passed or failed
   errors.jsonl               runs that never produced an answer (API errors, timeouts); not scored
@@ -18,6 +21,7 @@ After changing a case's checks, --regrade re-grades the saved answers without ru
 """
 
 import argparse
+import importlib
 import json
 import math
 import os
@@ -38,12 +42,14 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from agent import MODEL, Agent  # noqa: E402
-from answer_key import facts  # noqa: E402
 
-FLOW = ROOT / ".claude" / "hillclimb" / "analyst-answers"
-CSV = ROOT / "data" / "coffee_sales.csv"
+# name: (data file, questions, answer key module, results folder)
+SUITES = {
+    "coffee": ("coffee_sales.csv", "cases.json", "answer_key", "analyst-answers"),
+    "retail": ("online_retail.csv", "retail_cases.json", "retail_key", "retail-answers"),
+}
 JUDGE_MODEL = "claude-sonnet-5-5"
-PEEK = re.compile(r"evals|hillclimb|answer_key|cases\.json")  # files the agent has no reason to open
+PEEK = re.compile(r"evals|hillclimb|answer_key|retail_key|cases\.json")  # files the agent has no reason to open
 
 # Dollars per million tokens (Claude API list prices, October 2026). Cache writes cost 1.25x input.
 PRICES = {
@@ -69,9 +75,23 @@ class Failure(Exception):
         self.kind, self.model, self.usage = kind, model, usage
 
 
+def use_suite(name: str) -> None:
+    """Point the module at one suite's data, questions, answer key and results folder."""
+    global CSV, CASES, KEY, FLOW
+    data, cases, key, flow = SUITES[name]
+    CSV, CASES, FLOW = ROOT / "data" / data, ROOT / "evals" / cases, ROOT / ".claude" / "hillclimb" / flow
+    KEY = importlib.import_module(key)
+    if not CSV.exists():
+        fetch = " Get it with: uv run python scripts/fetch_online_retail.py" if name == "retail" else ""
+        sys.exit(f"{CSV.relative_to(ROOT)} is missing.{fetch}")
+
+
+use_suite("coffee")
+
+
 def load_cases(only: set[str] | None = None) -> list[dict]:
-    values = facts(CSV)
-    cases = json.loads((ROOT / "evals" / "cases.json").read_text())
+    values = KEY.facts(CSV)
+    cases = json.loads(CASES.read_text())
     for case in cases:
         case["checks"] = [{"id": c["id"], "text": c["text"].format_map(values)} for c in case.pop("criteria")]
     if only:
@@ -319,6 +339,7 @@ def summarize(variant_dir: Path, cases: list[dict]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the agent on the eval questions and grade its answers.")
+    parser.add_argument("--suite", default="coffee", choices=sorted(SUITES), help="Which eval to run (default: coffee).")
     parser.add_argument("--variant", default="baseline", help="Results folder: 'baseline', or v1, v2, ... for changes.")
     parser.add_argument("--cases", help="Comma-separated case ids to run (default: all).")
     parser.add_argument("--reps", type=int, default=2, help="Runs per case (default: 2).")
@@ -334,6 +355,7 @@ def main() -> None:
         sys.exit("--variant must be 'baseline' or v1, v2, ... (the report builder ignores other names).")
 
     load_dotenv(ROOT / ".env")
+    use_suite(args.suite)
     cases = load_cases(set(args.cases.split(",")) if args.cases else None)
     variant_dir = FLOW / args.variant
     (variant_dir / "traces").mkdir(parents=True, exist_ok=True)

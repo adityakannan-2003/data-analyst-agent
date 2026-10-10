@@ -9,6 +9,7 @@ dependencies = [
     "pandas",
     "matplotlib",
     "python-dotenv",
+    "openpyxl>=3.1.5",
 ]
 
 [tool.uv]
