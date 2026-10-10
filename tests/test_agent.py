@@ -145,3 +145,14 @@ def test_quiet_mode_prints_nothing(csv_path, capsys):
     finally:
         quiet.sandbox.close()
     assert capsys.readouterr().out == ""
+
+
+def test_profile_shows_comment_lines(tmp_path):
+    path = tmp_path / "prices.csv"
+    path.write_text("# Data source: example.com\nday,price\n1,10\n2,12\n")
+    described = Agent(path, tmp_path)
+    try:
+        assert "# Data source: example.com" in described.system
+        assert "2 rows x 2 columns" in described.system
+    finally:
+        described.sandbox.close()

@@ -22,6 +22,24 @@ import numpy as np
 MAX_OUTPUT_CHARS = 6000
 
 
+def comment_lines(csv_path) -> list[str]:
+    """Lines starting with '#' at the top of a file, such as '# Data source: ...'.
+    pandas would read the first one as the header, so they're skipped when loading."""
+    lines = []
+    with open(csv_path, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if not line.startswith("#"):
+                break
+            lines.append(line.rstrip("\n"))
+    return lines
+
+
+def read_data(csv_path):
+    import pandas as pd
+
+    return pd.read_csv(csv_path, skiprows=len(comment_lines(csv_path)))
+
+
 def _truncate(text: str) -> str:
     if len(text) <= MAX_OUTPUT_CHARS:
         return text
@@ -65,7 +83,7 @@ def _worker(conn, csv_path: str, out_dir: str) -> None:
     import pandas as pd
 
     try:
-        namespace = {"pd": pd, "np": np, "plt": plt, "df": pd.read_csv(csv_path)}
+        namespace = {"pd": pd, "np": np, "plt": plt, "df": read_data(csv_path)}
     except Exception as exc:
         conn.send((False, f"Could not load {csv_path}: {exc}"))
         return

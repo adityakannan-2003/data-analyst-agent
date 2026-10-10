@@ -53,3 +53,13 @@ def test_timeout_restarts_the_session(csv_path):
         assert not ok and "NameError" in output  # everything else is gone
     finally:
         sb.close()
+
+
+def test_comment_lines_at_the_top_are_skipped(tmp_path):
+    path = tmp_path / "prices.csv"
+    path.write_text("# Data source: example.com\nday,price\n1,10\n2,12\n")
+    sb = Sandbox(path, tmp_path, timeout=10)
+    try:
+        assert sb.run("list(df.columns), len(df)") == (True, "(['day', 'price'], 2)\n")
+    finally:
+        sb.close()

@@ -25,7 +25,7 @@ import anthropic
 import pandas as pd
 from dotenv import load_dotenv
 
-from sandbox import Sandbox
+from sandbox import Sandbox, comment_lines, read_data
 
 with contextlib.suppress(ImportError):
     import readline  # noqa: F401  (arrow keys and history in input())
@@ -92,10 +92,13 @@ TOOLS = [
 ]
 
 
-def profile(df: pd.DataFrame, name: str, max_columns: int = 60) -> str:
+def profile(df: pd.DataFrame, name: str, comments: list[str] = (), max_columns: int = 60) -> str:
     """A compact description of the data. It goes in the system prompt so the
     model doesn't spend a tool call on df.info() for every question."""
-    lines = [f"File: {name}", f"{len(df):,} rows x {df.shape[1]} columns", ""]
+    lines = [f"File: {name}"]
+    if comments:
+        lines += ["Comment lines at the top of the file (skipped when loading):", *comments]
+    lines += [f"{len(df):,} rows x {df.shape[1]} columns", ""]
     for col in df.columns[:max_columns]:
         s = df[col]
         examples = ", ".join(repr(v) if isinstance(v, str) else str(v) for v in s.dropna().unique()[:4])
@@ -212,9 +215,9 @@ def slug(text: str) -> str:
 
 class Agent:
     def __init__(self, csv_path: Path, out_dir: Path, model: str = MODEL, effort: str = "high", quiet: bool = False):
-        df = pd.read_csv(csv_path)
+        df = read_data(csv_path)
         self.shape = df.shape
-        self.system = SYSTEM_PROMPT.format(profile=profile(df, csv_path.name))
+        self.system = SYSTEM_PROMPT.format(profile=profile(df, csv_path.name, comment_lines(csv_path)))
         self.client = anthropic.Anthropic()
         self.model = model
         self.effort = effort

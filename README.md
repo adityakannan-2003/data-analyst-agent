@@ -62,6 +62,31 @@ Questions to try:
 - What are the busiest hours at each store?
 - How is the Matcha Latte doing since it launched?
 
+## On real data
+
+[data/stocks.csv](data/stocks.csv) is real: monthly prices for eight companies, the S&P 500 and the Nasdaq from 1990 to 2022, from Yahoo Finance. The file ships with matplotlib as sample data. It's messy in ways the coffee data isn't:
+
+- a comment line before the header
+- 133 completely empty rows
+- a last row that repeats the month before
+- companies that start partway through: Amazon in 1997, Google in 2004, Dell in 2016
+
+The comment line used to stop the agent from loading the file at all. Now it skips comment lines at the top and shows them to the model.
+
+> Which of these stocks gave investors the best return, and how did that compare with the S&P 500?
+
+The agent, on Sonnet 5.5, answered in two tool calls:
+
+- **Amazon gave the best return:** 33.6% a year since its 1997 listing (1,393x), against 6.0% a year for the S&P 500 over the same years.
+- **Fair comparisons:** it compared each stock with the S&P 500 over that stock's own dates, so a late starter like Dell (5.7 years) isn't measured against a 32-year record.
+- **Data problems, found on its own:** it dropped the empty rows and the repeated last row. It also flagged that the stock prices include dividends while the S&P 500 index doesn't, which flatters the stocks, and that the list was picked with hindsight.
+
+All of that matches my own calculation. One slip: it says Microsoft and Apple have bigger multiples than Amazon, but its own figures show Amazon's 1,393x is the largest.
+
+```bash
+uv run python agent.py data/stocks.csv
+```
+
 ## Setup
 
 You need [uv](https://docs.astral.sh/uv/) and an Anthropic API key.
