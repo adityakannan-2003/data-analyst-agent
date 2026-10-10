@@ -6,13 +6,9 @@ Ask questions about any CSV file in plain English. The agent writes pandas code,
 
 It's built directly on the Claude API. The agent loop is written by hand in about 70 lines (`Agent.ask` in [agent.py](agent.py)), with no agent framework.
 
-![The agent answering "Did the April price increase hurt latte sales?" in a terminal](docs/demo.gif)
+![The agent answering "Which product sold the most units?" about real retail data in a terminal](docs/demo.gif)
 
-This is a trick question. Latte sales fell 47% after the price rise, but customers also switch to iced drinks in summer, so some of that drop would have happened anyway. The agent (Sonnet 5.5, the default) compares lattes with items whose price didn't change, flags the seasonal shift and the Matcha Latte launch, and concludes the real price effect is smaller than the raw drop. The recording is real, with the model's thinking pauses shortened.
-
-An earlier run on Opus 5.5 drew this chart for the same question, with each drink's units set to 100 for the months before the increase. Lattes and cappuccinos fall below espresso, whose price didn't change:
-
-![Monthly units for latte, cappuccino, espresso and iced drinks. After April, latte and cappuccino fall below espresso](docs/price-increase-chart.png)
+This is real data: 541,909 transactions from a UK online shop, and the obvious answer is a trap. The two biggest sellers in raw sales were single huge orders, one of them for 80,995 paper crafts, and both were cancelled within minutes. The agent (Sonnet 5.5, the default) nets out the cancellations, finds the real best seller, and says how it counted. The recording is real, with the model's thinking pauses shortened.
 
 ## Results
 
@@ -64,6 +60,10 @@ Each question runs this loop until Claude stops asking for tools. The full conve
 | About 1.5% of rows missing `store` | Report them or set them aside; don't drop them silently |
 | 165 duplicate rows | Remove them before totaling |
 | Refunds recorded as negative quantities | Count them as negative revenue |
+
+For the price-increase question, an Opus 5.5 run drew this chart, with each drink's units set to 100 for the months before the increase. Lattes and cappuccinos fall below espresso, whose price didn't change:
+
+![Monthly units for latte, cappuccino, espresso and iced drinks. After April, latte and cappuccino fall below espresso](docs/price-increase-chart.png)
 
 Questions to try:
 
