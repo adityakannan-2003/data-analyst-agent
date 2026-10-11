@@ -3,3 +3,7 @@ gatherUsageStats = false
 
 [server]
 headless = true
+address = "localhost"  # only this computer can open the page: it runs code and spends your API key
+
+[client]
+toolbarMode = "minimal"  # hide the Deploy button and developer menu
