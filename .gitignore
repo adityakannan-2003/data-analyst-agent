@@ -16,3 +16,4 @@ out/
 !.claude/hillclimb/**/change.md
 .claude/hillclimb/**/*.log
 data/online_retail.csv
+.claude/launch.json

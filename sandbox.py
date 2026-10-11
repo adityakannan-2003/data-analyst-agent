@@ -171,7 +171,7 @@ class Sandbox:
         except EOFError:
             self._restart()
             return False, "The Python process crashed. It was restarted: `df` was reloaded and all other variables were lost."
-        except KeyboardInterrupt:
+        except BaseException:  # Ctrl+C, or a web page stopping the request midway
             self._restart()  # the child may still be running; don't let its late reply desync the pipe
             raise
         self._restart()

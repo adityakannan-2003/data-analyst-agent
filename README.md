@@ -38,6 +38,7 @@ Each question runs this loop until Claude stops asking for tools. The full conve
 - **Code runs in a child process with persistent state.** Variables survive between calls, the way notebook cells do. If code hangs, the parent kills the child after 60 seconds and starts a fresh one. Errors are trimmed to the lines of the agent's own code (`line 2: df['price']` / `KeyError: 'price'`) instead of 40 frames of pandas internals, so the model can see what to fix.
 - **The dataset profile is sent up front.** The system prompt lists each column's type, missing count, distinct count, and example values. That saves a tool call on every question. It also flags messy data early: 32 distinct spellings for 8 products is a hint that names need cleaning.
 - **The model sees its own charts.** `save_chart` returns the PNG to the model as an image, so it can notice overlapping labels or a bad scale and redraw the chart.
+- **One agent, two front ends.** The agent reports each step as it happens (a note, text, a tool call, its result, a chart) through an `on_event` hook. The terminal prints them, and the web page in [app.py](app.py) shows them live, so both show exactly what the evals tested.
 - **Streaming output.** The answer prints as it's written, and each tool call shows a preview of the code it runs. The request also sets `thinking.display: "updates"`, so if the model writes a short progress note between tool calls, it prints dimmed. The model's full reasoning stays hidden.
 - **Prompt caching.** The growing conversation is cached between turns. The usage line after each answer shows how many input tokens came from the cache.
 
@@ -139,11 +140,25 @@ uv sync
 cp .env.example .env
 ```
 
-Open `.env` and paste in your API key. Then start a chat:
+Open `.env` and paste in your API key. Then use the agent in your browser or in the terminal.
+
+### In your browser
+
+```bash
+uv run streamlit run app.py
+```
+
+Open http://localhost:8501. Pick a dataset or upload your own CSV in the sidebar, then ask questions. Charts appear under each answer, and "How it worked" shows the code the agent ran and what came back. Follow-up questions remember the conversation.
+
+![The web page: a question about UK vs. rest-of-world sales, the agent's answer and its chart](docs/web-app.jpg)
+
+### In the terminal
 
 ```bash
 uv run python agent.py data/coffee_sales.csv
 ```
+
+After each answer, the agent opens its final chart in your image viewer. Add `--no-open` to turn that off.
 
 Or ask one question and exit:
 
@@ -295,4 +310,4 @@ The agent runs model-written Python on your machine with your user's permissions
 - Try Sonnet at medium effort on the eval, to see whether it keeps 22 of 22 for less.
 - Add a `--confirm` flag that shows each piece of code and waits for approval before running it.
 - Support Excel, Parquet, or a SQL database as the data source.
-- Put a Streamlit or Gradio front end on it, with charts shown inline.
+- Host a public demo that runs on each visitor's own Claude account, so it doesn't spend your API credit.

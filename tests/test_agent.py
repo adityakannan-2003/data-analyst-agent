@@ -156,3 +156,20 @@ def test_profile_shows_comment_lines(tmp_path):
         assert "2 rows x 2 columns" in described.system
     finally:
         described.sandbox.close()
+
+
+def test_steps_are_reported_to_on_event(csv_path):
+    events = []
+    watched = Agent(csv_path, csv_path.parent, quiet=True, on_event=events.append)
+    try:
+        watched.client = FakeClient([
+            turn(tool_use("t1", "run_python", code="1 + 1"), tool_use("c1", "save_chart", code="df.sales.plot()", name="s"),
+                 stop_reason="tool_use"),
+            turn(text("Done.")),
+        ])
+        watched.ask("Question")
+    finally:
+        watched.sandbox.close()
+    assert [e["type"] for e in events] == ["tool_call", "tool_result", "tool_call", "chart"]
+    assert events[1] == {"type": "tool_result", "ok": True, "output": "2\n"}
+    assert events[3]["path"].endswith("chart_1_s.png")

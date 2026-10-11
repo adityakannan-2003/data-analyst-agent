@@ -10,6 +10,7 @@ dependencies = [
     "matplotlib",
     "python-dotenv",
     "openpyxl>=3.1.5",
+    "streamlit>=1.65.0",
 ]
 
 [tool.uv]

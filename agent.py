@@ -17,6 +17,7 @@ import contextlib
 import json
 import os
 import re
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -148,15 +149,18 @@ def silent(*args, **kwargs) -> None:
 
 
 class StreamPrinter:
-    """Prints one streamed model turn: progress notes dimmed, answer text as it arrives."""
+    """Prints one streamed model turn: progress notes dimmed, answer text as it arrives.
+    Also passes notes and text to on_event, for front ends other than the terminal."""
 
-    def __init__(self, out=print):
+    def __init__(self, out=print, on_event=None):
         self.out = out
+        self.on_event = on_event or silent
         self.in_note = False
         self.at_line_start = True
 
     def handle(self, event) -> None:
         if event.type == "thinking" and event.thinking:
+            self.on_event({"type": "note", "text": event.thinking})
             # With display="updates", non-empty thinking text is a progress note; reasoning stays hidden.
             if not self.in_note:
                 self.newline()
@@ -166,6 +170,7 @@ class StreamPrinter:
         elif event.type == "content_block_start" and event.content_block.type == "text":
             self.newline()
         elif event.type == "text":
+            self.on_event({"type": "text", "text": event.text})
             self.write(event.text)
         elif event.type == "content_block_stop":
             if self.in_note:
@@ -214,7 +219,9 @@ def slug(text: str) -> str:
 
 
 class Agent:
-    def __init__(self, csv_path: Path, out_dir: Path, model: str = MODEL, effort: str = "high", quiet: bool = False):
+    def __init__(
+        self, csv_path: Path, out_dir: Path, model: str = MODEL, effort: str = "high", quiet: bool = False, on_event=None
+    ):
         df = read_data(csv_path)
         self.shape = df.shape
         self.system = SYSTEM_PROMPT.format(profile=profile(df, csv_path.name, comment_lines(csv_path)))
@@ -223,6 +230,8 @@ class Agent:
         self.effort = effort
         self.out_dir = out_dir
         self.out = silent if quiet else print  # quiet mode lets several agents run side by side (see evals/)
+        # on_event receives each step as a dict: note, text, tool_call, tool_result or chart (see app.py)
+        self.on_event = on_event or silent
         self.sandbox = Sandbox(csv_path, out_dir)
         self.messages: list = []  # the whole conversation, so follow-up questions have context
         self.charts = 0
@@ -283,7 +292,7 @@ class Agent:
     def _call_model(self):
         """One model turn, streamed so progress notes and the answer print as they arrive."""
         for _ in range(3):
-            printer = StreamPrinter(self.out)
+            printer = StreamPrinter(self.out, self.on_event)
             try:
                 with self.client.beta.messages.stream(
                     model=self.model,
@@ -317,9 +326,11 @@ class Agent:
             return self._error(block, f"Invalid input for {block.name}: {json.dumps(args)[:500]}")
 
         show_tool_call(block.name, args["code"], self.out)
+        self.on_event({"type": "tool_call", "name": block.name, "code": args["code"]})
         if block.name == "run_python":
             ok, output = self.sandbox.run(args["code"])
             show_result(ok, output, self.out)
+            self.on_event({"type": "tool_result", "ok": ok, "output": output})
             return {"type": "tool_result", "tool_use_id": block.id, "content": output or "(no output)", "is_error": not ok}
 
         if block.name == "save_chart":
@@ -328,9 +339,11 @@ class Agent:
             ok, output = self.sandbox.chart(args["code"], filename)
             if not ok:
                 show_result(ok, output, self.out)
+                self.on_event({"type": "tool_result", "ok": False, "output": output})
                 return {"type": "tool_result", "tool_use_id": block.id, "content": output, "is_error": True}
             path = self.out_dir / filename
             self.out(f"{DIM}    ✓ saved {path}{RESET}")
+            self.on_event({"type": "chart", "path": str(path)})
             note = f"Saved to {path}." + (f"\nOutput:\n{output}" if output.strip() else "")
             image = base64.standard_b64encode(path.read_bytes()).decode()
             return {
@@ -347,7 +360,21 @@ class Agent:
 
     def _error(self, block, message: str) -> dict:
         self.out(f"{RED}    ✗ {message[:120]}{RESET}")
+        self.on_event({"type": "tool_result", "ok": False, "output": message})
         return {"type": "tool_result", "tool_use_id": block.id, "content": message, "is_error": True}
+
+
+def open_file(path: Path) -> None:
+    """Open a file in the computer's default viewer (Preview on a Mac)."""
+    try:
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", str(path)])
+        elif sys.platform == "win32":
+            os.startfile(path)
+        else:
+            subprocess.Popen(["xdg-open", str(path)])
+    except OSError:
+        pass  # no viewer available; the path is printed anyway
 
 
 def has_credentials() -> bool:
@@ -368,6 +395,7 @@ def main() -> None:
         help="How much the model thinks before acting (default: high).",
     )
     parser.add_argument("--out", type=Path, default=Path("out"), help="Folder for charts (default: out/).")
+    parser.add_argument("--no-open", action="store_true", help="Don't open charts automatically in chat mode.")
     args = parser.parse_args()
 
     load_dotenv()
@@ -377,7 +405,9 @@ def main() -> None:
         sys.exit(f"File not found: {args.csv}")
     args.out.mkdir(parents=True, exist_ok=True)
 
-    agent = Agent(args.csv, args.out, args.model, args.effort)
+    charts: list[str] = []
+    agent = Agent(args.csv, args.out, args.model, args.effort,
+                  on_event=lambda event: charts.append(event["path"]) if event["type"] == "chart" else None)
     try:
         if args.question:
             agent.ask(args.question)
@@ -395,6 +425,9 @@ def main() -> None:
                 break
             if question:
                 agent.ask(question)
+                if charts and not args.no_open:
+                    open_file(Path(charts[-1]))  # the last one: the agent sometimes redraws a chart to fix it
+                charts.clear()
     finally:
         agent.sandbox.close()
 
