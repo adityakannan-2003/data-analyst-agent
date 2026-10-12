@@ -11,6 +11,7 @@ dependencies = [
     "python-dotenv",
     "openpyxl>=3.1.5",
     "streamlit>=1.65.0",
+    "psycopg[binary]>=3.2",
 ]
 
 [tool.uv]

@@ -17,3 +17,6 @@ out/
 .claude/hillclimb/**/*.log
 data/online_retail.csv
 .claude/launch.json
+
+# Streamlit secrets for running hosted_app.py locally (the hosted page keeps them in its settings)
+.streamlit/secrets.toml

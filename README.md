@@ -20,6 +20,10 @@ Two evals check the agent's answers automatically, one on real data and one on m
 | Questions | 15 | 22 |
 | Passed on every run (Sonnet 5.5) | 15 of 15 | 22 of 22 |
 | Cost / time per answer | $0.017 / 9 s | $0.02 / 10 s |
+| Passed on every run, code in Anthropic's sandbox | 15 of 15 | 22 of 22 |
+| Cost / time per answer, in the sandbox | $0.025 / 16 s | $0.039 / 21 s |
+
+The last two rows are the version behind the public web page, which runs the agent's code in Anthropic's sandbox instead of on your computer. See [Online version](#online-version).
 
 ## How it works
 
@@ -174,13 +178,38 @@ Options:
 - `--effort`: `low` to `max`, defaults to `high`. Lower is faster and cheaper; higher is more careful.
 - `--out`: the folder for charts, `out/` by default.
 
+## Online version
+
+[hosted_app.py](hosted_app.py) is a public version of the web page. Anyone with the link can ask questions about the sample data or their own CSV, on your API key, inside a monthly budget. [DEPLOY.md](DEPLOY.md) has the setup: a separate API key with a spend limit, a Postgres database, and Streamlit Community Cloud.
+
+A public page can't run strangers' questions as code on its own server. So this version runs the agent's code in Claude's code execution tool instead ([cloud_agent.py](cloud_agent.py)): an isolated container for each conversation, with no internet access and none of the server's secrets. The CSV goes up through the Files API and is mounted in the container, and charts come back as files. The loop has the same shape as `Agent.ask`, with one addition: a long turn can end with `pause_turn`, and sending the conversation back unchanged resumes it.
+
+Moving the code changes how the agent works, so both evals were run again on the sandbox version, with the same questions, model and grader:
+
+```bash
+uv run python evals/run_eval.py --executor cloud --variant v4
+uv run python evals/run_eval.py --suite retail --executor cloud --variant v1
+```
+
+It passed every question on both runs, 22 of 22 on the made-up data and 15 of 15 on the real data. It costs more and takes about twice as long: $0.039 and 21 seconds per answer on the coffee data, against $0.02 and 10 seconds locally. Most of the extra cost is input. The tokens written to the cache about double per answer (3,000 to 6,300 on the coffee data, 2,200 to 4,300 on the retail data), even on the retail data, where the number of steps didn't change. That points to the code execution tool's own instructions, which go with every request. On the coffee data the agent also takes more steps (3.5 against 2.6) and writes about 60% more, since Python variables don't carry over between commands in the sandbox. Every answer and grade is in [results.jsonl](.claude/hillclimb/analyst-answers/v4/results.jsonl) and [the retail results](.claude/hillclimb/retail-answers/v1/results.jsonl).
+
+The page records every question: what was asked, the answer, the code the agent ran, the cost, the time taken, and the visitor's thumbs up or down. For uploaded files, what the code printed isn't kept. `scripts/usage_report.py` summarizes the log, and picks a random sample of live answers to grade by hand, since live questions have no answer key.
+
+To try the page on your own computer first:
+
+```bash
+uv run streamlit run hosted_app.py
+```
+
+Without a `DATABASE_URL`, it logs to `out/usage.db`.
+
 ## Tests
 
 ```bash
 uv run pytest
 ```
 
-No API key needed, so they also run on GitHub on every push. The sandbox tests run real code. The agent-loop tests replace the API with a fake client that returns scripted model turns: tool calls, parallel calls, malformed input, cut-off input, charts, and refusals.
+No API key needed, so they also run on GitHub on every push. The sandbox tests run real code. The agent-loop tests replace the API with a fake client that returns scripted model turns: tool calls, parallel calls, malformed input, cut-off input, charts, and refusals. The sandbox version's tests do the same for its loop: mounting the file, reusing the container, resuming a paused turn, downloading charts and deleting them from the Files API. The usage log is tested on SQLite.
 
 ## Evaluation
 
@@ -302,7 +331,7 @@ uv run python scripts/make_demo_gif.py --replay out/demo_recording.json
 The agent runs model-written Python on your machine with your user's permissions. The child process protects the agent from crashes and hangs. It does not stop malicious code. Two things to keep in mind:
 
 - Only analyze files you trust. Cell values are shown to the model, so a CSV could contain text that tries to steer it.
-- For untrusted data, run the agent in a container, or switch to Claude's server-side code execution tool, which runs code in Anthropic's sandbox.
+- For untrusted data, use the sandbox version: `uv run python cloud_agent.py data.csv -q "..."` runs the code in Claude's code execution tool, on Anthropic's servers, instead of on your machine.
 
 ## Ideas to extend it
 
@@ -310,4 +339,4 @@ The agent runs model-written Python on your machine with your user's permissions
 - Try Sonnet at medium effort on the eval, to see whether it keeps 22 of 22 for less.
 - Add a `--confirm` flag that shows each piece of code and waits for approval before running it.
 - Support Excel, Parquet, or a SQL database as the data source.
-- Host a public demo that runs on each visitor's own Claude account, so it doesn't spend your API credit.
+- Give the sandbox version programmatic tool calling, which keeps Python variables between commands, and measure whether that brings its cost back down toward the local version's.
