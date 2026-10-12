@@ -42,6 +42,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from agent import MODEL, Agent  # noqa: E402
+from cloud_agent import CloudAgent, describe, result_text  # noqa: E402
+from pricing import cost, usage_dict  # noqa: E402
 
 # name: (data file, questions, answer key module, results folder)
 SUITES = {
@@ -50,13 +52,6 @@ SUITES = {
 }
 JUDGE_MODEL = "claude-sonnet-5-5"
 PEEK = re.compile(r"evals|hillclimb|answer_key|retail_key|cases\.json")  # files the agent has no reason to open
-
-# Dollars per million tokens (Claude API list prices, October 2026). Cache writes cost 1.25x input.
-PRICES = {
-    "claude-opus-5-5": {"input": 4.00, "output": 20.00, "cache_read": 0.20},
-    "claude-sonnet-5-5": {"input": 2.00, "output": 10.00, "cache_read": 0.20},
-    "claude-haiku-5-5": {"input": 0.10, "output": 0.50, "cache_read": 0.01},
-}
 
 JUDGE_SYSTEM = """\
 You grade answers from a data analyst assistant. You get a question, the assistant's answer, and a list of checks. Decide for each check whether the answer meets it.
@@ -102,35 +97,6 @@ def load_cases(only: set[str] | None = None) -> list[dict]:
     return cases
 
 
-def usage_dict(u) -> dict:
-    """Usage in the API's shape, where input_tokens excludes cache reads and writes."""
-    if hasattr(u, "cache_read_tokens"):  # agent.Usage, which totals all input
-        return {
-            "input_tokens": u.input_tokens - u.cache_read_tokens - u.cache_write_tokens,
-            "output_tokens": u.output_tokens,
-            "cache_read_input_tokens": u.cache_read_tokens,
-            "cache_creation_input_tokens": u.cache_write_tokens,
-        }
-    return {
-        "input_tokens": u.input_tokens,
-        "output_tokens": u.output_tokens,
-        "cache_read_input_tokens": u.cache_read_input_tokens or 0,
-        "cache_creation_input_tokens": u.cache_creation_input_tokens or 0,
-    }
-
-
-def cost(model: str, usage: dict) -> float | None:
-    price = PRICES.get(model)
-    if not price or not usage:
-        return None
-    return (
-        usage["input_tokens"] * price["input"]
-        + usage["cache_creation_input_tokens"] * price["input"] * 1.25
-        + usage["cache_read_input_tokens"] * price["cache_read"]
-        + usage["output_tokens"] * price["output"]
-    ) / 1e6
-
-
 def judge(client: anthropic.Anthropic, judge_model: str, case: dict, answer: str) -> tuple[dict, dict]:
     """Grade one answer. Returns ({check_id: {reason, met}}, judge usage)."""
     schema = {
@@ -168,18 +134,30 @@ def judge(client: anthropic.Anthropic, judge_model: str, case: dict, answer: str
     return json.loads(text), usage
 
 
-def to_trace(agent: Agent, charts_ref: Path) -> list[dict]:
+def to_trace(agent, charts_ref: Path) -> list[dict]:
     """The conversation as report turns: system, user, assistant, tool_call, tool_result.
     Chart images are attached by their path relative to the flow folder (charts_ref/<file>)."""
     turns = [{"role": "system", "content": agent.system}]
+    saved = getattr(agent, "saved", {})  # CloudAgent: the file id of each chart -> where it was saved
     for message in agent.messages:
         if isinstance(message["content"], str):
             turns.append({"role": message["role"], "content": message["content"]})
             continue
-        for block in message["content"]:
-            block = block if isinstance(block, dict) else block.model_dump()
+        for raw in message["content"]:
+            block = raw if isinstance(raw, dict) else raw.model_dump()
             if block["type"] == "text" and block["text"].strip():
-                turns.append({"role": "assistant", "content": block["text"]})
+                turns.append({"role": message["role"], "content": block["text"]})
+            elif block["type"] == "server_tool_use":
+                name, code = describe(raw)
+                turns.append({"role": "tool_call", "name": name, "content": code})
+            elif block["type"].endswith("_code_execution_tool_result"):
+                ok, text = result_text(raw)
+                turn = {"role": "tool_result", "content": ("" if ok else "Error:\n") + text}
+                files = getattr(raw.content, "content", None) if raw.content.type == "bash_code_execution_result" else None
+                charts = [saved[f.file_id] for f in files or [] if f.file_id in saved]
+                if charts:
+                    turn["attachments"] = [{"kind": "image", "ref": str(charts_ref / Path(c).name), "alt": "chart"} for c in charts]
+                turns.append(turn)
             elif block["type"] == "tool_use":
                 args = block["input"] if isinstance(block["input"], dict) else {}
                 header = f"# chart: {args['name']}\n" if "name" in args else ""
@@ -207,14 +185,18 @@ def run_case(case: dict, rep: int, args, variant_dir: Path, judge_client, starte
     started[(case["id"], rep)] = time.monotonic()
     # Charts go to a temp folder first, so the agent never sees a path inside the eval's folder.
     scratch = Path(tempfile.mkdtemp(prefix="agent-charts-"))
-    agent = Agent(CSV, scratch, model=args.model, effort=args.effort, quiet=True)
-    agent.client = agent.client.with_options(max_retries=8)  # backs off with jitter on 429 and overload
+    if args.executor == "cloud":
+        client = anthropic.Anthropic(max_retries=8)  # backs off with jitter on 429 and overload
+        agent = CloudAgent(CSV, scratch, model=args.model, effort=args.effort, quiet=True, file_id=args.file_id, client=client)
+    else:
+        agent = Agent(CSV, scratch, model=args.model, effort=args.effort, quiet=True)
+        agent.client = agent.client.with_options(max_retries=8)
     try:
         t0 = time.monotonic()
         answer = agent.ask(case["question"])
         latency = time.monotonic() - t0
     finally:
-        agent.sandbox.close()
+        agent.close()
         charts_ref = Path(variant_dir.name) / "charts" / f"{case['id']}_rep{rep}"
         if any(scratch.iterdir()):
             shutil.copytree(scratch, FLOW / charts_ref, dirs_exist_ok=True)
@@ -240,7 +222,8 @@ def run_case(case: dict, rep: int, args, variant_dir: Path, judge_client, starte
         "usage": usage,
         "latency_s": round(latency, 1),
         "tool_calls": answer.usage.tool_calls,
-        "meta": {"answer": answer.text, "answer_status": answer.status, "answer_words": len(answer.text.split()), "peeked": peeked},
+        "meta": {"answer": answer.text, "answer_status": answer.status, "answer_words": len(answer.text.split()), "peeked": peeked,
+                 "executor": args.executor},
     }
     if answer.status == "truncated":
         row["grade"] = {}
@@ -345,6 +328,8 @@ def main() -> None:
     parser.add_argument("--reps", type=int, default=2, help="Runs per case (default: 2).")
     parser.add_argument("--model", default=MODEL, help=f"Model for the agent (default: {MODEL}).")
     parser.add_argument("--effort", default="high", help="The agent's effort level (default: high).")
+    parser.add_argument("--executor", default="local", choices=["local", "cloud"],
+                        help="Where the agent's code runs: this computer, or Anthropic's sandbox as on the hosted page.")
     parser.add_argument("--judge-model", default=JUDGE_MODEL, help=f"Model that grades answers (default: {JUDGE_MODEL}).")
     parser.add_argument("--concurrency", type=int, default=4, help="Cases to run at once (default: 4).")
     parser.add_argument("--timeout-s", type=int, default=600, help="Give up on a run after this many seconds.")
@@ -370,11 +355,18 @@ def main() -> None:
     done = {(r["prompt_id"], r["rep"]) for r in existing}
     todo = [(c, rep) for c in cases for rep in range(args.reps) if (c["id"], rep) not in done]
     ran_with = {r["model"] for r in existing}
-    if todo and ran_with and ran_with != {args.model}:  # never mix two models' results in one variant
+    ran_on = {r["meta"].get("executor", "local") for r in existing}
+    if todo and ((ran_with and ran_with != {args.model}) or (ran_on and ran_on != {args.executor})):
+        # never mix two models' or two executors' results in one variant
         taken = [int(d.name[1:]) for d in FLOW.glob("v*") if re.fullmatch(r"v\d+", d.name)]
-        sys.exit(f"{args.variant} was run with {', '.join(sorted(ran_with))}, not {args.model}. "
-                 f"Save these results under a new variant, for example --variant v{max(taken, default=0) + 1}.")
-    print(f"{len(todo)} runs to do on {args.model} (effort {args.effort}), {len(done)} already done. Judge: {args.judge_model}.")
+        sys.exit(f"{args.variant} was run with {', '.join(sorted(ran_with))} ({', '.join(sorted(ran_on))} code), not "
+                 f"{args.model} ({args.executor} code). Save these results under a new variant, for example "
+                 f"--variant v{max(taken, default=0) + 1}.")
+    print(f"{len(todo)} runs to do on {args.model} (effort {args.effort}, {args.executor} code), {len(done)} already done. "
+          f"Judge: {args.judge_model}.")
+    args.file_id = None
+    if todo and args.executor == "cloud":  # upload the data once and share it, instead of once per run
+        args.file_id = anthropic.Anthropic(max_retries=8).files.upload(file=CSV).id
 
     judge_client = anthropic.Anthropic(max_retries=8)
     started: dict = {}
@@ -410,6 +402,8 @@ def main() -> None:
                                            "message": f"no answer after {args.timeout_s}s", "at": datetime.now(timezone.utc).isoformat()})
                 print(f"  timeout {case_id} run {rep}")
 
+    if args.file_id:
+        anthropic.Anthropic(max_retries=8).files.delete(args.file_id)
     summarize(variant_dir, cases)
     if abandoned:  # timed-out runs may still be going in their threads; don't wait for them
         sys.stdout.flush()

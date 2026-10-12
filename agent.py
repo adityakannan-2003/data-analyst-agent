@@ -289,6 +289,9 @@ class Agent:
             answer.status, answer.error = "error", f"{type(exc).__name__}: {exc}"
         return answer
 
+    def close(self) -> None:
+        self.sandbox.close()
+
     def _call_model(self):
         """One model turn, streamed so progress notes and the answer print as they arrive."""
         for _ in range(3):
