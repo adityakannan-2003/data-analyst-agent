@@ -4,6 +4,8 @@
 
 Ask questions about any CSV file in plain English. The agent writes pandas code, runs it, reads the output, fixes its own errors, and draws charts. Every number in its answer comes from code it actually ran.
 
+**Try it online: [adityakannan-data-analyst.streamlit.app](https://adityakannan-data-analyst.streamlit.app)**, no account or API key needed.
+
 It's built directly on the Claude API. The agent loop is written by hand in about 70 lines (`Agent.ask` in [agent.py](agent.py)), with no agent framework.
 
 ![The agent answering "Which product sold the most units?" about real retail data in a terminal](docs/demo.gif)
@@ -180,7 +182,7 @@ Options:
 
 ## Online version
 
-[hosted_app.py](hosted_app.py) is a public version of the web page. Anyone with the link can ask questions about the sample data or their own CSV, on your API key, inside a monthly budget. [DEPLOY.md](DEPLOY.md) has the setup: a separate API key with a spend limit, a Postgres database, and Streamlit Community Cloud.
+[hosted_app.py](hosted_app.py) is the public version of the web page, live at [adityakannan-data-analyst.streamlit.app](https://adityakannan-data-analyst.streamlit.app). Anyone with the link can ask questions about the sample data or their own CSV, on your API key, inside a monthly budget. [DEPLOY.md](DEPLOY.md) has the setup: a separate API key with a spend limit, a Postgres database, and Streamlit Community Cloud.
 
 A public page can't run strangers' questions as code on its own server. So this version runs the agent's code in Claude's code execution tool instead ([cloud_agent.py](cloud_agent.py)): an isolated container for each conversation, with no internet access and none of the server's secrets. The CSV goes up through the Files API and is mounted in the container, and charts come back as files. The loop has the same shape as `Agent.ask`, with one addition: a long turn can end with `pause_turn`, and sending the conversation back unchanged resumes it.
 
