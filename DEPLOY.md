@@ -7,7 +7,7 @@ It differs from `app.py`, which only runs on your own computer, in four ways:
 - **The agent's code runs in Anthropic's sandbox, never on the server.** `cloud_agent.py` uses Claude's code execution tool: an isolated container per conversation, with no internet access and none of the server's secrets. A visitor can't get the agent to read the API key or the database password, because that code never runs where they are.
 - **One setup:** Sonnet 5.5 at high effort, the setup both evals measured on the sandbox (see the README).
 - **Limits:** the page stops answering once the month's spend reaches `MONTHLY_BUDGET_USD`, and each visit gets `QUESTIONS_PER_VISIT` questions.
-- **A usage log** (`usage_log.py`): each question, its answer, the code the agent ran, the cost, the time taken, and the visitor's thumbs up or down. For uploaded files, what the code printed isn't kept, because that output is the visitor's data. The uploads themselves are deleted from Anthropic's Files API when the visitor switches data or starts over, or within a day.
+- **A usage log** (`usage_log.py`): each question, its answer, the code the agent ran, the cost, the time taken, and the visitor's thumbs up or down. For uploaded files, what the code printed isn't kept, because that output is the visitor's data. If an upload looks like it has personal data (`privacy.py`), the page warns the visitor and the log keeps no question, answer or code for it, only cost, time, status and rating. The uploads themselves are deleted from Anthropic's Files API when the visitor switches data or starts over, or within a day.
 
 Setup takes about 20 minutes, in three accounts.
 

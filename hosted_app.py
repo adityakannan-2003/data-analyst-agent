@@ -34,8 +34,9 @@ from agent import MODEL
 from app import DATASETS, EXAMPLES, UPLOAD, latest_charts, md
 from cloud_agent import CloudAgent, safe_filename
 from pricing import PRICES, cost, usage_dict
+from privacy import describe, personal_columns
 from sandbox import comment_lines
-from usage_log import UsageLog, month_start
+from usage_log import WITHHELD, UsageLog, month_start
 
 ROOT = Path(__file__).resolve().parent
 EFFORT = "high"
@@ -162,8 +163,9 @@ def get_agent(csv_path: Path, file_id: str | None) -> CloudAgent:
     return st.session_state.agent
 
 
-def ask(agent: CloudAgent, question: str, dataset: str) -> dict:
-    """Run one question, showing the steps live; record it; return the message to keep in the chat."""
+def ask(agent: CloudAgent, question: str, dataset: str, withhold: bool = False) -> dict:
+    """Run one question, showing the steps live; record it; return the message to keep in the chat.
+    withhold: the visitor's file looked like personal data, so the log keeps no question, answer or code."""
     status = st.status("Working on it. Questions usually take 20 to 60 seconds...", expanded=False)
     answer_box = st.empty()
     steps, charts, streamed, note = [], [], [], []
@@ -222,8 +224,9 @@ def ask(agent: CloudAgent, question: str, dataset: str) -> dict:
     try:
         question_id = usage_log().record(
             session_id=st.session_state.session_id, dataset="upload" if dataset == UPLOAD else dataset,
-            data_rows=agent.shape[0], data_cols=agent.shape[1], question=question, answer=answer.text,
-            status=answer.status, error=answer.error, steps=logged_steps, model=served,
+            data_rows=agent.shape[0], data_cols=agent.shape[1], question=WITHHELD if withhold else question,
+            answer=None if withhold else answer.text, status=answer.status, error=answer.error,
+            steps=[] if withhold else logged_steps, model=served,
             input_tokens=usage["input_tokens"], output_tokens=usage["output_tokens"],
             cache_read_tokens=usage["cache_read_input_tokens"], cache_write_tokens=usage["cache_creation_input_tokens"],
             tool_calls=answer.usage.tool_calls, cost_usd=spent, latency_s=round(latency, 1),
@@ -268,7 +271,8 @@ def sidebar() -> tuple[str, Path | None]:
             "**What this page keeps.** Your questions, the answers, the code the agent ran, what each answer cost "
             "and how long it took, and your ratings. I use them to see how people use the agent and where it goes "
             "wrong. For files you upload, what the code printed isn't kept, and the file is deleted from Anthropic's "
-            "servers when you switch data or start over, or within a day. Please don't upload personal or "
+            "servers when you switch data or start over, or within a day. If a file looks like it has personal "
+            "data, your questions and the answers about it aren't kept either. Please don't upload personal or "
             "confidential data."
         )
         st.markdown(f"The agent's code runs in Anthropic's sandbox, never on this server. [Code and evals on GitHub]({REPO_URL})")
@@ -305,6 +309,14 @@ def main() -> None:
     st.caption(f"Ask about **{csv_path.name}** ({rows:,} rows × {cols} columns) in plain English. The agent "
                "writes and runs Python to work out every number, and shows its code. Follow-up questions "
                "remember the conversation.")
+    personal = {}
+    if choice == UPLOAD:  # checked on this server, before any question; the check sends nothing anywhere
+        personal = personal_columns(pd.read_csv(csv_path, dtype=str, nrows=500, skiprows=len(comment_lines(csv_path))))
+    if personal:
+        st.warning(f"This file looks like it has personal data: {md(describe(personal))}. Your questions and the "
+                   "answers about it won't be kept in this page's log. The file itself still goes to Anthropic's "
+                   "sandbox for the analysis, and is deleted when you switch data or start over, or within a day. "
+                   "If you'd rather not share it, remove those columns and upload the file again.")
 
     for message in st.session_state.chat:
         with st.chat_message(message["role"]):
@@ -345,7 +357,7 @@ def main() -> None:
         with st.chat_message("user"):
             st.markdown(md(question))
         with st.chat_message("assistant"):
-            st.session_state.chat.append(ask(agent, question, choice))
+            st.session_state.chat.append(ask(agent, question, choice, withhold=bool(personal)))
         st.rerun()  # redraw with the feedback buttons live and the example buttons gone
 
 

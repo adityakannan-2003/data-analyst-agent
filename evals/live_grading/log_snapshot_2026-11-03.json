@@ -1,0 +1,17 @@
+{
+ "taken_at": "2026-11-03T19:14:39+00:00",
+ "source": "hosted usage log (Postgres via DATABASE_URL), opened read-only; counts only, no visitor text",
+ "questions": 1,
+ "visits": 1,
+ "first_asked": "2026-10-13T02:50:51+00:00",
+ "last_asked": "2026-10-13T02:50:51+00:00",
+ "by_status": {
+  "ok": 1
+ },
+ "by_dataset": {
+  "Coffee chain (made up)": 1
+ },
+ "rated": 0,
+ "cost_usd": 0.0425,
+ "note": "The one question was asked 41 seconds before commit 0a6c11a (Link the live page from the README): the owner's launch test, not a visitor."
+}

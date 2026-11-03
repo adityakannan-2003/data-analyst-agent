@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS questions (
     feedback_at TEXT
 )
 """
+# Recorded instead of the question when the visitor's file looked like personal data (privacy.py); the
+# answer and the code aren't kept either, only what it cost, how long it took, how it ended and its rating.
+WITHHELD = "[withheld: the uploaded file looked like personal data]"
 COLUMNS = [
     "id", "asked_at", "session_id", "dataset", "data_rows", "data_cols", "question", "answer", "status", "error",
     "steps", "model", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "tool_calls",

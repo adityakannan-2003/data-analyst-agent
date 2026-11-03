@@ -154,10 +154,12 @@ def kind_of(column: str, values: list[str]) -> str | None:
     if words & HINTS["handle"] and share(values, lambda v: bool(re.fullmatch(r"@?[A-Za-z][\w.]{2,30}", v))) >= 0.5 and distinct >= 8:
         return "handle"
     alphabetic = share(values, lambda v: bool(re.fullmatch(r"[^\W\d_][^\d@]*", v.strip()))) >= 0.8
-    if alphabetic and distinct >= 8:
+    name_share = share(values, looks_like_name)
+    # distinct >= 8 keeps out categories ("email", "phone", "sms"); a small file of real names gets in by its names
+    if alphabetic and (distinct >= 8 or name_share >= 0.5):
         if words & PERSON:
             return "name"
-        if share(values, looks_like_name) >= (0.3 if words & GENERIC_NAME else 0.5):
+        if name_share >= (0.3 if words & GENERIC_NAME else 0.5):
             return "name"
     return None
 

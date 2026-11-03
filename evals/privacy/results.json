@@ -1,0 +1,144 @@
+{
+ "claude-opus-5-5": {
+  "test": {
+   "columns": 135,
+   "tp": 61,
+   "fp": 1,
+   "fn": 0,
+   "tn": 73,
+   "precision": 0.9839,
+   "precision_ci95": [
+    0.9141,
+    0.9971
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.9408,
+    1.0
+   ],
+   "f1": 0.9919,
+   "missed": [],
+   "false_alarms": [
+    "c120 Store Phone (said phone)"
+   ]
+  },
+  "all": {
+   "columns": 135,
+   "tp": 61,
+   "fp": 1,
+   "fn": 0,
+   "tn": 73,
+   "precision": 0.9839,
+   "precision_ci95": [
+    0.9141,
+    0.9971
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.9408,
+    1.0
+   ],
+   "f1": 0.9919,
+   "missed": [],
+   "false_alarms": [
+    "c120 Store Phone (said phone)"
+   ]
+  },
+  "test_recall_by_kind": {
+   "name": "14/14",
+   "email": "8/8",
+   "phone": "8/8",
+   "gov_id": "6/6",
+   "address": "5/5",
+   "postcode": "5/5",
+   "financial": "4/4",
+   "birth_date": "3/3",
+   "text_with_contact": "3/3",
+   "ip_address": "2/2",
+   "handle": "2/2",
+   "location": "1/1"
+  },
+  "cost_usd": 0.8031,
+  "median_latency_s": 1.44
+ },
+ "rules": {
+  "dev": {
+   "columns": 90,
+   "tp": 40,
+   "fp": 0,
+   "fn": 0,
+   "tn": 50,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.9124,
+    1.0
+   ],
+   "recall": 1.0,
+   "recall_ci95": [
+    0.9124,
+    1.0
+   ],
+   "f1": 1.0,
+   "missed": [],
+   "false_alarms": []
+  },
+  "test": {
+   "columns": 135,
+   "tp": 60,
+   "fp": 0,
+   "fn": 1,
+   "tn": 74,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.9398,
+    1.0
+   ],
+   "recall": 0.9836,
+   "recall_ci95": [
+    0.9128,
+    0.9971
+   ],
+   "f1": 0.9917,
+   "missed": [
+    "c021 col_2 (name)"
+   ],
+   "false_alarms": []
+  },
+  "all": {
+   "columns": 225,
+   "tp": 100,
+   "fp": 0,
+   "fn": 1,
+   "tn": 124,
+   "precision": 1.0,
+   "precision_ci95": [
+    0.963,
+    1.0
+   ],
+   "recall": 0.9901,
+   "recall_ci95": [
+    0.946,
+    0.9983
+   ],
+   "f1": 0.995,
+   "missed": [
+    "c021 col_2 (name)"
+   ],
+   "false_alarms": []
+  },
+  "test_recall_by_kind": {
+   "name": "13/14",
+   "email": "8/8",
+   "phone": "8/8",
+   "gov_id": "6/6",
+   "address": "5/5",
+   "postcode": "5/5",
+   "financial": "4/4",
+   "birth_date": "3/3",
+   "text_with_contact": "3/3",
+   "ip_address": "2/2",
+   "handle": "2/2",
+   "location": "1/1"
+  }
+ }
+}

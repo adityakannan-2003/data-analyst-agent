@@ -20,8 +20,11 @@ def test_sample_is_repeatable_and_graded_results_keep_no_visitor_text(tmp_path, 
                    answer=f"secret answer {i}", status="cancelled" if i == 0 else "ok",
                    steps=[{"type": "tool_call", "name": "bash", "code": f"print({i})"},
                           {"type": "tool_result", "ok": True, "output": None if i % 3 else f"{i}"}])
+    log.record(session_id="s", dataset="upload", question=usage_report.WITHHELD, status="ok")
     rows = log.rows()
 
+    path = usage_report.export_sample(rows, 40, seed=0, name="2026-10")
+    assert usage_report.WITHHELD not in path.with_suffix(".md").read_text()  # nothing was kept to grade
     path = usage_report.export_sample(rows, 20, seed=0, name="2026-10")
     again = usage_report.export_sample(rows, 20, seed=0, name="2026-10")
     picked = list(csv.DictReader(path.open()))

@@ -29,7 +29,7 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from usage_log import UsageLog, month_start  # noqa: E402
+from usage_log import WITHHELD, UsageLog, month_start  # noqa: E402
 
 
 def percentile(values: list[float], p: float) -> float:
@@ -89,7 +89,8 @@ GUIDE = """How to grade (about 1 to 2 minutes each). Put one of these in the `co
 def export_sample(rows: list[dict], n: int, seed: int, name: str) -> Path:
     """Write n random questions to grade: a CSV for the verdicts and a Markdown copy to read them in.
     Every question counts, not just finished answers, so the rate is the share of questions answered right."""
-    gradable = [r for r in rows if r["status"] != "cancelled"]  # the visitor left; there's nothing to grade
+    # cancelled: the visitor left; withheld: the file looked personal, so nothing was kept to grade
+    gradable = [r for r in rows if r["status"] != "cancelled" and r["question"] != WITHHELD]
     picked = random.Random(seed).sample(gradable, min(n, len(gradable)))
     out = ROOT / "out" / "grading" / f"sample_{name}_seed{seed}.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
