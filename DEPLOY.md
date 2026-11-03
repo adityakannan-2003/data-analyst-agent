@@ -70,17 +70,19 @@ uv run streamlit run scripts/usage_dashboard.py --server.port 8503   # the same 
 
 Both open the log read-only: the database refuses any write from them. The dashboard is served to your computer only, and isn't part of the public page.
 
-Live questions have no answer key, so to measure accuracy on real traffic, grade a random sample by hand:
+Live questions have no answer key, so to measure accuracy on real traffic, grade a random sample by hand once a month (about 30 minutes for 20):
 
 ```bash
-uv run python scripts/usage_report.py --sample 20
+uv run python scripts/usage_report.py --month 2026-11 --sample 20
 ```
 
-That writes `out/grading/sample_<date>.csv` with each question, the answer and the code. Put `y` or `n` in the `correct` column, then:
+That picks 20 of the month's questions (seed 0, so the pick can be repeated) and writes two files to `out/grading/`, which stays on your computer: `sample_2026-11_seed0.md` to read (question, answer, the code it ran and what came back, and how to grade) and `sample_2026-11_seed0.csv`. Put `y`, `n` or `skip` in the CSV's `correct` column, then:
 
 ```bash
-uv run python scripts/usage_report.py --grades out/grading/sample_<date>.csv
+uv run python scripts/usage_report.py --grades out/grading/sample_2026-11_seed0.csv
 ```
+
+That prints the share correct with a 95% interval and saves it to `evals/live_grading/2026-11_seed0.json`, with ids and verdicts only, so it can be committed without any visitor's question.
 
 ## What it costs
 
