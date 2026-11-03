@@ -113,7 +113,7 @@ def main() -> None:
         return
     load_dotenv(ROOT / ".env")
     since = f"{args.since}T00:00:00+00:00" if args.since else month_start()
-    rows = UsageLog().rows(since)
+    rows = UsageLog(read_only=True).rows(since)
     report(rows, since)
     if args.sample:
         export_sample(rows, args.sample, args.seed)

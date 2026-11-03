@@ -1,7 +1,10 @@
 """Tests for the hosted page's usage log, on SQLite."""
 
 import json
+import sqlite3
 from datetime import datetime, timezone
+
+import pytest
 
 from usage_log import UsageLog, month_start
 
@@ -31,6 +34,15 @@ def test_spend_from_earlier_months_does_not_count(tmp_path):
     october = month_start(datetime(2026, 10, 12, 15, 30, tzinfo=timezone.utc))
     assert october == "2026-10-01T00:00:00+00:00"
     assert log.spent_since(october) == 1.0
+
+
+def test_read_only_log_reads_but_cannot_write(tmp_path):
+    make_log(tmp_path).record(session_id="s", dataset="d", question="q", status="ok", cost_usd=0.05)
+    reader = UsageLog(database_url="", sqlite_path=tmp_path / "usage.db", read_only=True)
+
+    assert [r["question"] for r in reader.rows()] == ["q"]
+    with pytest.raises(sqlite3.OperationalError, match="readonly"):
+        reader.record(session_id="s", dataset="d", question="q2", status="ok")
 
 
 def test_feedback_can_be_given_changed_and_cleared(tmp_path):

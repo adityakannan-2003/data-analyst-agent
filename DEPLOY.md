@@ -65,7 +65,10 @@ The first visitor to pick the UK retail data after a restart waits a minute or t
 ```bash
 uv run python scripts/usage_report.py                  # this month: questions, cost, time, ratings, visits
 uv run python scripts/usage_report.py --since 2026-10-01
+uv run streamlit run scripts/usage_dashboard.py --server.port 8503   # the same as charts: per day, errors, thumbs down
 ```
+
+Both open the log read-only: the database refuses any write from them. The dashboard is served to your computer only, and isn't part of the public page.
 
 Live questions have no answer key, so to measure accuracy on real traffic, grade a random sample by hand:
 

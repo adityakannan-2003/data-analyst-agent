@@ -55,18 +55,30 @@ def month_start(at: datetime | None = None) -> str:
 
 
 class UsageLog:
-    def __init__(self, database_url: str | None = None, sqlite_path: Path = Path("out/usage.db")):
+    def __init__(self, database_url: str | None = None, sqlite_path: Path = Path("out/usage.db"), read_only: bool = False):
+        """read_only: for reports on the hosted log. The database itself refuses any write, and the table
+        isn't created."""
         self.database_url = os.environ.get("DATABASE_URL") if database_url is None else database_url
         if self.database_url:
             import psycopg  # only needed on the hosted page
 
-            self.connect = lambda: psycopg.connect(self.database_url, autocommit=True)
+            def connect():
+                connection = psycopg.connect(self.database_url, autocommit=not read_only)
+                if read_only:
+                    connection.read_only = True  # each query runs in BEGIN READ ONLY
+                return connection
+
+            self.connect = connect
             self.mark = "%s"
+        elif read_only:
+            self.connect = lambda: sqlite3.connect(f"file:{sqlite_path}?mode=ro", uri=True)
+            self.mark = "?"
         else:
             sqlite_path.parent.mkdir(parents=True, exist_ok=True)
             self.connect = lambda: sqlite3.connect(sqlite_path)
             self.mark = "?"
-        self._run(SCHEMA)
+        if not read_only:
+            self._run(SCHEMA)
 
     def record(self, **row) -> str:
         """Save one answered question. Returns its id, which feedback refers to."""
