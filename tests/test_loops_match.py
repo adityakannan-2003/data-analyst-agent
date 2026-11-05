@@ -14,8 +14,10 @@ import anthropic
 import httpx2
 import pytest
 
-from agent import MODEL, Agent
-from graph_agent import GraphAgent
+pytest.importorskip("langgraph", reason="the LangGraph loop's packages aren't installed: uv sync --all-groups")
+
+from agent import MODEL, Agent  # noqa: E402
+from graph_agent import GraphAgent  # noqa: E402
 
 USAGE = {"input_tokens": 2, "cache_creation_input_tokens": 100, "cache_read_input_tokens": 1500,
          "cache_creation": {"ephemeral_5m_input_tokens": 100, "ephemeral_1h_input_tokens": 0}, "output_tokens": 1}

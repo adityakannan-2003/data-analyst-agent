@@ -208,10 +208,10 @@ Without a `DATABASE_URL`, it logs to `out/usage.db`.
 ## Tests
 
 ```bash
-uv run pytest
+uv run --all-groups pytest
 ```
 
-No API key needed, so they also run on GitHub on every push. The sandbox tests run real code. The agent-loop tests replace the API with a fake client that returns scripted model turns: tool calls, parallel calls, malformed input, cut-off input, charts, and refusals. The sandbox version's tests do the same for its loop: mounting the file, reusing the container, resuming a paused turn, downloading charts and deleting them from the Files API. The usage log is tested on SQLite.
+`--all-groups` adds the packages for the LangGraph version of the loop ([docs/LANGGRAPH.md](docs/LANGGRAPH.md)). They're kept in their own group so the public app doesn't install them; without it, those tests are skipped. No API key needed, so the tests also run on GitHub on every push. The sandbox tests run real code. The agent-loop tests replace the API with a fake client that returns scripted model turns: tool calls, parallel calls, malformed input, cut-off input, charts, and refusals. The sandbox version's tests do the same for its loop: mounting the file, reusing the container, resuming a paused turn, downloading charts and deleting them from the Files API. The usage log is tested on SQLite.
 
 ## Evaluation
 

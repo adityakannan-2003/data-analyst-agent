@@ -7,13 +7,16 @@ from types import SimpleNamespace as NS
 import anthropic
 import httpx2
 import pytest
-from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, SystemMessage
-from test_agent import FakeClient
-from test_agent import text as hand_text
-from test_agent import turn as hand_turn
 
-from agent import MAX_STEPS, MODEL, Agent, StreamPrinter
-from graph_agent import GraphAgent, TurnPrinter, api_usage
+pytest.importorskip("langgraph", reason="the LangGraph loop's packages aren't installed: uv sync --all-groups")
+
+from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, SystemMessage  # noqa: E402
+from test_agent import FakeClient  # noqa: E402
+from test_agent import text as hand_text  # noqa: E402
+from test_agent import turn as hand_turn  # noqa: E402
+
+from agent import MAX_STEPS, MODEL, Agent, StreamPrinter  # noqa: E402
+from graph_agent import GraphAgent, TurnPrinter, api_usage  # noqa: E402
 
 
 class FakeModel:

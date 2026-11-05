@@ -11,6 +11,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - name: Install dependencies
-        run: uv sync --locked
+        run: uv sync --locked --all-groups
       - name: Run tests (no API key needed)
-        run: uv run pytest
+        run: uv run --all-groups pytest

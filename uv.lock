@@ -452,10 +452,12 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "pytest" },
+]
+langgraph = [
     { name = "jiter" },
     { name = "langchain-anthropic" },
     { name = "langgraph" },
-    { name = "pytest" },
 ]
 
 [package.metadata]
@@ -470,11 +472,11 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [
+dev = [{ name = "pytest" }]
+langgraph = [
     { name = "jiter", specifier = ">=0.17.0" },
     { name = "langchain-anthropic", specifier = ">=1.7.10" },
     { name = "langgraph", specifier = ">=1.2.19" },
-    { name = "pytest" },
 ]
 
 [[package]]

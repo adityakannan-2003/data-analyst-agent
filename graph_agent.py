@@ -5,9 +5,9 @@ tool code. So the two can be compared on the same evals with the loop as the onl
 
     START -> model --(route)--> tools -> model -> ... -> END
 
-Usage, the same as agent.py:
-    uv run python graph_agent.py data/coffee_sales.csv
-    uv run python graph_agent.py data/coffee_sales.csv -q "Which store makes the most money?"
+Usage, the same as agent.py, with the langgraph dependency group:
+    uv run --group langgraph python graph_agent.py data/coffee_sales.csv
+    uv run --group langgraph python graph_agent.py data/coffee_sales.csv -q "Which store makes the most money?"
 """
 
 from types import SimpleNamespace

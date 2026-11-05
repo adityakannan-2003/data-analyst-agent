@@ -5,23 +5,27 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from test_graph_agent import FakeModel, call, turn
 
 from agent import MODEL
-from graph_agent import GraphAgent
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "evals"))  # run_eval imports the answer keys from there
 import run_eval  # noqa: E402
 
 
 def test_a_langgraph_run_saves_its_loop_turns_and_trace(csv_path, tmp_path, monkeypatch):
+    pytest.importorskip("langgraph", reason="the LangGraph loop's packages aren't installed: uv sync --all-groups")
+    import graph_agent
+    from test_graph_agent import FakeModel, call, turn
+
+    real = graph_agent.GraphAgent
+
     def scripted_agent(*args, **kwargs):
-        made = GraphAgent(*args, **kwargs)
+        made = real(*args, **kwargs)
         made.llm = FakeModel([turn(call("t1", "run_python", code="df.sales.sum()"), text="Let me add them up."),
                               turn(text="Total sales are 22.")])
         return made
 
-    monkeypatch.setattr(run_eval, "GraphAgent", scripted_agent)
+    monkeypatch.setattr(graph_agent, "GraphAgent", scripted_agent)  # run_case imports it from graph_agent
     monkeypatch.setattr(run_eval, "CSV", csv_path)
     monkeypatch.setattr(run_eval, "FLOW", tmp_path)
     monkeypatch.setattr(run_eval, "grade", lambda row, *rest: row)  # no judge

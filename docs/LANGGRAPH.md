@@ -48,7 +48,7 @@ The hand-written one:
 - **Same results.** The loop changed nothing the evals measure: pass rate, steps, cost or time. Both loops scored 100%, so the evals show that LangGraph broke nothing on the paths they cover. They can't show which loop answers better, and they don't reach the rare cases under [Where the loops still differ](#where-the-loops-still-differ).
 - **Less code to read and own.** 66 lines against 150. The graph itself is 11; most of the extra lines translate LangChain's objects into what the rest of the program uses.
 - **Fewer surprises.** Matching the hand-written loop took eight fixes found by replaying API streams through both loops, and three more from a code review. A few differences can't be fixed without overriding LangChain's private methods (see [Where the loops still differ](#where-the-loops-still-differ)).
-- **No extra packages.** LangChain and LangGraph add 21 packages; here they're installed for development only.
+- **No extra packages.** LangChain and LangGraph add 21 packages. Here they sit in their own dependency group, which the public app doesn't install.
 - **The public page has its own loop.** [cloud_agent.py](../cloud_agent.py) runs the code in Anthropic's sandbox, so moving to LangGraph would mean rebuilding that loop too.
 
 LangGraph would be worth it if the agent became a workflow with branches: several agents, a person approving steps before they run, runs that resume after a crash, or steps that run in parallel. It has built-in support for these: interrupts, checkpoints saved to a database, and parallel nodes. This agent is one loop.

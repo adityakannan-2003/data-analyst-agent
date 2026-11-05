@@ -19,10 +19,14 @@ package = false
 
 [dependency-groups]
 dev = [
+    "pytest",
+]
+# The LangGraph version of the loop (graph_agent.py) and its tests. Not a default group, so a plain
+# `uv sync`, which is how the public app on Streamlit installs, leaves it out. `uv sync --all-groups` adds it.
+langgraph = [
     "jiter>=0.17.0",
     "langchain-anthropic>=1.7.10",
     "langgraph>=1.2.19",
-    "pytest",
 ]
 
 [tool.pytest.ini_options]

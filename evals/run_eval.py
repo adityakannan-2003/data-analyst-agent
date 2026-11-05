@@ -4,7 +4,7 @@
     uv run python evals/run_eval.py --suite retail                   # the real-data eval
     uv run python evals/run_eval.py --cases refunds,top-store --reps 1
     uv run python evals/run_eval.py --variant v1 --effort medium     # try a change, compare with baseline
-    uv run python evals/run_eval.py --loop langgraph --variant langgraph-v1   # the LangGraph loop in graph_agent.py
+    uv run --group langgraph python evals/run_eval.py --loop langgraph --variant langgraph-v1   # graph_agent.py's loop
 
 There are two suites. "coffee" (the default) asks evals/cases.json about the made-up coffee chain,
 with expected values from evals/answer_key.py. "retail" asks evals/retail_cases.json about the real
@@ -44,7 +44,6 @@ sys.path.insert(0, str(ROOT))
 
 from agent import MODEL, Agent  # noqa: E402
 from cloud_agent import CloudAgent, describe, result_text  # noqa: E402
-from graph_agent import GraphAgent  # noqa: E402
 from pricing import cost, usage_dict  # noqa: E402
 
 # name: (data file, questions, answer key module, results folder)
@@ -191,6 +190,8 @@ def run_case(case: dict, rep: int, args, variant_dir: Path, judge_client, starte
         client = anthropic.Anthropic(max_retries=8)  # backs off with jitter on 429 and overload
         agent = CloudAgent(CSV, scratch, model=args.model, effort=args.effort, quiet=True, file_id=args.file_id, client=client)
     elif args.loop == "langgraph":
+        from graph_agent import GraphAgent  # only this loop needs the langgraph dependency group
+
         agent = GraphAgent(CSV, scratch, model=args.model, effort=args.effort, quiet=True, max_retries=8)
     else:
         agent = Agent(CSV, scratch, model=args.model, effort=args.effort, quiet=True)
