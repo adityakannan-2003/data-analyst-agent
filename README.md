@@ -40,7 +40,7 @@ Each question runs this loop until Claude stops asking for tools. The full conve
 
 ## Design decisions
 
-- **A hand-written loop instead of a framework.** `Agent.ask` calls the model, runs every tool call in the response, and sends all results back in one message. It stops when the model answers without calling a tool. It also handles the edge cases a demo usually skips: refusals, tool input cut off at the output limit, malformed tool input, a cap on steps, and rolling back the conversation on Ctrl+C or an API error.
+- **A hand-written loop instead of a framework.** `Agent.ask` calls the model, runs every tool call in the response, and sends all results back in one message. It stops when the model answers without calling a tool. It also handles the edge cases a demo usually skips: refusals, tool input cut off at the output limit, malformed tool input, a cap on steps, and rolling back the conversation on Ctrl+C or an API error. To test that choice, the loop was rebuilt in LangGraph and both ran on the same 37 eval questions: same pass rate, steps, cost and time, with 2.3 times the code. See [docs/LANGGRAPH.md](docs/LANGGRAPH.md).
 - **Code runs in a child process with persistent state.** Variables survive between calls, the way notebook cells do. If code hangs, the parent kills the child after 60 seconds and starts a fresh one. Errors are trimmed to the lines of the agent's own code (`line 2: df['price']` / `KeyError: 'price'`) instead of 40 frames of pandas internals, so the model can see what to fix.
 - **The dataset profile is sent up front.** The system prompt lists each column's type, missing count, distinct count, and example values. That saves a tool call on every question. It also flags messy data early: 32 distinct spellings for 8 products is a hint that names need cleaning.
 - **The model sees its own charts.** `save_chart` returns the PNG to the model as an image, so it can notice overlapping labels or a bad scale and redraw the chart.
@@ -208,10 +208,10 @@ Without a `DATABASE_URL`, it logs to `out/usage.db`.
 ## Tests
 
 ```bash
-uv run pytest
+uv run --all-groups pytest
 ```
 
-No API key needed, so they also run on GitHub on every push. The sandbox tests run real code. The agent-loop tests replace the API with a fake client that returns scripted model turns: tool calls, parallel calls, malformed input, cut-off input, charts, and refusals. The sandbox version's tests do the same for its loop: mounting the file, reusing the container, resuming a paused turn, downloading charts and deleting them from the Files API. The usage log is tested on SQLite.
+`--all-groups` adds the packages for the LangGraph version of the loop ([docs/LANGGRAPH.md](docs/LANGGRAPH.md)). They're kept in their own group so the public app doesn't install them; without it, those tests are skipped. No API key needed, so the tests also run on GitHub on every push. The sandbox tests run real code. The agent-loop tests replace the API with a fake client that returns scripted model turns: tool calls, parallel calls, malformed input, cut-off input, charts, and refusals. The sandbox version's tests do the same for its loop: mounting the file, reusing the container, resuming a paused turn, downloading charts and deleting them from the Files API. The usage log is tested on SQLite.
 
 ## Evaluation
 
