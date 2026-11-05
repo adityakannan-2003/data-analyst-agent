@@ -18,7 +18,12 @@ dependencies = [
 package = false
 
 [dependency-groups]
-dev = ["pytest"]
+dev = [
+    "jiter>=0.17.0",
+    "langchain-anthropic>=1.7.10",
+    "langgraph>=1.2.19",
+    "pytest",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

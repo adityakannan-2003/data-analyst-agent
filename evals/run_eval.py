@@ -4,6 +4,7 @@
     uv run python evals/run_eval.py --suite retail                   # the real-data eval
     uv run python evals/run_eval.py --cases refunds,top-store --reps 1
     uv run python evals/run_eval.py --variant v1 --effort medium     # try a change, compare with baseline
+    uv run python evals/run_eval.py --loop langgraph --variant langgraph-v1   # the LangGraph loop in graph_agent.py
 
 There are two suites. "coffee" (the default) asks evals/cases.json about the made-up coffee chain,
 with expected values from evals/answer_key.py. "retail" asks evals/retail_cases.json about the real
@@ -43,6 +44,7 @@ sys.path.insert(0, str(ROOT))
 
 from agent import MODEL, Agent  # noqa: E402
 from cloud_agent import CloudAgent, describe, result_text  # noqa: E402
+from graph_agent import GraphAgent  # noqa: E402
 from pricing import cost, usage_dict  # noqa: E402
 
 # name: (data file, questions, answer key module, results folder)
@@ -188,6 +190,8 @@ def run_case(case: dict, rep: int, args, variant_dir: Path, judge_client, starte
     if args.executor == "cloud":
         client = anthropic.Anthropic(max_retries=8)  # backs off with jitter on 429 and overload
         agent = CloudAgent(CSV, scratch, model=args.model, effort=args.effort, quiet=True, file_id=args.file_id, client=client)
+    elif args.loop == "langgraph":
+        agent = GraphAgent(CSV, scratch, model=args.model, effort=args.effort, quiet=True, max_retries=8)
     else:
         agent = Agent(CSV, scratch, model=args.model, effort=args.effort, quiet=True)
         agent.client = agent.client.with_options(max_retries=8)
@@ -222,8 +226,9 @@ def run_case(case: dict, rep: int, args, variant_dir: Path, judge_client, starte
         "usage": usage,
         "latency_s": round(latency, 1),
         "tool_calls": answer.usage.tool_calls,
+        "model_turns": len(answer.models),
         "meta": {"answer": answer.text, "answer_status": answer.status, "answer_words": len(answer.text.split()), "peeked": peeked,
-                 "executor": args.executor},
+                 "executor": args.executor, "loop": args.loop},
     }
     if answer.status == "truncated":
         row["grade"] = {}
@@ -330,14 +335,22 @@ def main() -> None:
     parser.add_argument("--effort", default="high", help="The agent's effort level (default: high).")
     parser.add_argument("--executor", default="local", choices=["local", "cloud"],
                         help="Where the agent's code runs: this computer, or Anthropic's sandbox as on the hosted page.")
+    parser.add_argument("--loop", default="hand-written", choices=["hand-written", "langgraph"],
+                        help="The agent loop: agent.py's, or the LangGraph one in graph_agent.py (local executor only).")
     parser.add_argument("--judge-model", default=JUDGE_MODEL, help=f"Model that grades answers (default: {JUDGE_MODEL}).")
     parser.add_argument("--concurrency", type=int, default=4, help="Cases to run at once (default: 4).")
     parser.add_argument("--timeout-s", type=int, default=600, help="Give up on a run after this many seconds.")
     parser.add_argument("--summary", action="store_true", help="Only print the summary of existing results.")
     parser.add_argument("--regrade", action="store_true", help="Re-grade saved answers after changing checks (no agent runs).")
     args = parser.parse_args()
-    if not re.fullmatch(r"baseline|v\d+", args.variant):
-        sys.exit("--variant must be 'baseline' or v1, v2, ... (the report builder ignores other names).")
+    # The folder name says which loop made its results, so the two loops' results can never mix.
+    if args.loop == "langgraph" and not re.fullmatch(r"langgraph-v\d+", args.variant):
+        sys.exit("With --loop langgraph, --variant must be langgraph-v1, langgraph-v2, ...")
+    if args.loop == "hand-written" and not re.fullmatch(r"baseline|v\d+", args.variant):
+        sys.exit("--variant must be 'baseline' or v1, v2, ... (the report builder ignores other names). "
+                 "langgraph-v1, langgraph-v2, ... are for --loop langgraph.")
+    if args.loop == "langgraph" and args.executor == "cloud":
+        sys.exit("--loop langgraph runs the agent's code on this computer only: use --executor local.")
 
     load_dotenv(ROOT / ".env")
     use_suite(args.suite)
@@ -358,11 +371,13 @@ def main() -> None:
     ran_on = {r["meta"].get("executor", "local") for r in existing}
     if todo and ((ran_with and ran_with != {args.model}) or (ran_on and ran_on != {args.executor})):
         # never mix two models' or two executors' results in one variant
-        taken = [int(d.name[1:]) for d in FLOW.glob("v*") if re.fullmatch(r"v\d+", d.name)]
+        prefix = "langgraph-v" if args.loop == "langgraph" else "v"
+        taken = [int(d.name[len(prefix):]) for d in FLOW.glob(prefix + "*") if re.fullmatch(prefix + r"\d+", d.name)]
         sys.exit(f"{args.variant} was run with {', '.join(sorted(ran_with))} ({', '.join(sorted(ran_on))} code), not "
                  f"{args.model} ({args.executor} code). Save these results under a new variant, for example "
-                 f"--variant v{max(taken, default=0) + 1}.")
-    print(f"{len(todo)} runs to do on {args.model} (effort {args.effort}, {args.executor} code), {len(done)} already done. "
+                 f"--variant {prefix}{max(taken, default=0) + 1}.")
+    print(f"{len(todo)} runs to do on {args.model} (effort {args.effort}, {args.executor} code, {args.loop} loop), "
+          f"{len(done)} already done. "
           f"Judge: {args.judge_model}.")
     args.file_id = None
     if todo and args.executor == "cloud":  # upload the data once and share it, instead of once per run
