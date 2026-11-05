@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import anthropic
+import httpx2
 import pandas as pd
 from dotenv import load_dotenv
 
@@ -245,7 +246,9 @@ class Agent:
             for _ in range(MAX_STEPS):
                 response = self._call_model()
                 answer.usage.add(response.usage)
-                answer.models.append(response.model)
+                # usage.iterations names a fallback model that served the turn, even when no fallback block marked it.
+                served = [i.model for i in response.usage.iterations or [] if i.type == "fallback_message"]
+                answer.models.append(served[-1] if served else response.model)
 
                 if response.stop_reason == "refusal":
                     del self.messages[start:]  # drop the declined question so later questions still work
@@ -283,7 +286,8 @@ class Agent:
             del self.messages[start:]
             self.out(f"\n{DIM}[cancelled]{RESET}")
             answer.status = "cancelled"
-        except (anthropic.APIError, RuntimeError) as exc:
+        # The SDK turns a lost connection into an APIError only before the response starts; mid-stream it's httpx2's.
+        except (anthropic.APIError, httpx2.TransportError, RuntimeError) as exc:
             del self.messages[start:]
             self.out(f"\n{RED}Error: {exc}{RESET}")
             answer.status, answer.error = "error", f"{type(exc).__name__}: {exc}"
@@ -311,12 +315,16 @@ class Agent:
                 ) as stream:
                     for event in stream:
                         printer.handle(event)
-                    printer.finish()
-                    return stream.get_final_message()
+                    response = stream.get_final_message()
+                    if response.stop_reason is None:  # the stream ended before message_delta: the turn is incomplete
+                        raise RuntimeError("The response ended before the message was complete.")
+                    return response
             except ValueError:
                 # Tool input JSON the SDK couldn't parse at all (possible with eager input streaming).
                 # No tool_use block completed, so there is nothing to answer: run the turn again.
-                printer.finish()
+                pass
+            finally:
+                printer.finish()  # end the last printed line, whether the turn finished, failed or will run again
         raise RuntimeError("The model's tool input couldn't be parsed after 3 tries.")
 
     def _run_tool(self, block) -> dict:

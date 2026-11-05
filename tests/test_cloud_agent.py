@@ -168,12 +168,20 @@ def test_a_refusal_drops_the_question_so_the_next_one_starts_cleanly(make_agent)
     assert agent.client.requests[1]["messages"][0]["content"][0]["type"] == "container_upload"
 
 
-def test_an_api_error_rolls_back_the_question(make_agent):
-    error = anthropic.APIConnectionError(request=httpx2.Request("POST", "https://api.anthropic.com/v1/messages"))
-    agent = make_agent([error])
+@pytest.mark.parametrize("failure, error", [
+    (anthropic.APIConnectionError(request=httpx2.Request("POST", "https://api.anthropic.com/v1/messages")),
+     "APIConnectionError"),
+    # What the SDK lets through when the connection drops while the stream is read.
+    (httpx2.RemoteProtocolError("peer closed connection without sending complete message body"), "RemoteProtocolError"),
+    # A stream that ended before message_delta, so with no stop reason.
+    (response(text("Total sales are"), stop_reason=None),
+     "RuntimeError: The response ended before the message was complete."),
+])
+def test_an_error_rolls_back_the_question(make_agent, failure, error):
+    agent = make_agent([failure])
     answer = agent.ask("What are total sales?")
 
-    assert answer.status == "error" and "APIConnectionError" in answer.error
+    assert (answer.status, answer.text) == ("error", "") and error in answer.error
     assert agent.messages == []
 
 

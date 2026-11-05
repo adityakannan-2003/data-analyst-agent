@@ -13,6 +13,7 @@ Usage, the same as agent.py, with the langgraph dependency group:
 from types import SimpleNamespace
 
 import anthropic
+import httpx2
 from jiter import from_json
 from langchain_anthropic import ChatAnthropic
 from langchain_core.callbacks import BaseCallbackHandler
@@ -53,6 +54,8 @@ class GraphAgent(Agent):
             try:
                 response = self.llm.invoke([SystemMessage(self.system), *state["messages"]])
                 read_tool_input(response)
+                if response.response_metadata.get("stop_reason") is None:  # no message_delta, as in _call_model
+                    raise RuntimeError("The response ended before the message was complete.")
                 return {"messages": [response]}
             except ValueError:  # from the stream or from tool input the SDK's parser rejects: run the turn again,
                 pass            # as _call_model does
@@ -87,7 +90,7 @@ class GraphAgent(Agent):
             answer.status = "max_steps"
         except KeyboardInterrupt:
             answer.status = "cancelled"
-        except (anthropic.APIError, RuntimeError) as exc:
+        except (anthropic.APIError, httpx2.TransportError, RuntimeError) as exc:  # the same errors as Agent.ask
             # LangChain re-raises SDK errors as its own subclasses; report the SDK's, as Agent.ask does.
             exc = exc.__cause__ if isinstance(exc.__cause__, anthropic.APIError) else exc
             answer.status, answer.error, message = "error", f"{type(exc).__name__}: {exc}", str(exc)
@@ -96,6 +99,7 @@ class GraphAgent(Agent):
         for m in new:
             if m.type == "ai":
                 answer.usage.add(api_usage(m))
+                # LangChain drops usage.iterations, so this misses a fallback named only there (docs/LANGGRAPH.md).
                 answer.models.append(m.response_metadata.get("model_name"))
             elif m.type == "tool":
                 answer.usage.tool_calls += 1
@@ -162,9 +166,8 @@ class TurnPrinter(BaseCallbackHandler):
     def on_llm_end(self, response, **kwargs) -> None:  # the whole turn arrived; Agent._call_model finishes here too
         self.printer.finish()
 
-    def on_llm_error(self, error, **kwargs) -> None:
-        if isinstance(error, ValueError):  # the turn will run again; Agent._call_model finishes printing first
-            self.printer.finish()
+    def on_llm_error(self, error, **kwargs) -> None:  # the turn failed or will run again: finish, as _call_model does
+        self.printer.finish()
 
 
 def route(state: MessagesState) -> str:

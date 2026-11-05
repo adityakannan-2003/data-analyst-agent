@@ -74,23 +74,24 @@ LangGraph would be worth it if the agent became a workflow with branches: severa
 
 Most of these are on rare paths; the last two affect every run, though only memory matters, and only in a long chat. No eval run failed, and no hand-written run reported a model other than the one asked for.
 
-- **Fallback models.** With the server-side fallback beta, the SDK's types say a fallback in the middle of a turn is marked with a `fallback` block. LangChain drops content blocks it doesn't know, so the LangGraph loop would record the wrong model for that turn and leave the block out of the next request, which the API may reject. Fixing it means overriding a private LangChain method.
-- **Token counts.** LangChain reads them only from the `message_delta` event near the end of the stream. The API repeats the full counts there, so they match, but a stream that ends before that event counts zero.
+- **Fallback models.** With the server-side fallback beta, the SDK's types say a fallback in the middle of a turn is marked with a `fallback` block, and any fallback that served a turn is named in `usage.iterations`. LangChain drops both: content blocks it doesn't know, and everything in the usage except the token counts. So the LangGraph loop records the model asked for, and leaves the block out of the next request, which the API may reject. Fixing it means overriding a private LangChain method.
 - **Rejected tool input.** The SDK stops reading at the first piece of input it can't parse, and the hand-written loop runs the turn again. LangGraph reads the whole turn first, so it prints all of it and waits longer.
 - **A response with no events.** LangChain raises a `ValueError`, which the LangGraph loop treats like unparseable tool input: it asks twice more, then reports an error. The hand-written loop raises an `AssertionError` out of `ask`.
 - **Empty text.** LangChain leaves empty or whitespace-only text, and assistant turns left with nothing, out of the history it sends back. The hand-written loop sends them unchanged, which the API may reject on the next request.
 - **Printing.** Text or a progress note that arrives in a block's start event is printed, and passed to `on_event`, by the LangGraph loop only.
 - **Memory.** The LangGraph loop keeps a full copy of the conversation for every question asked: 2.5 MB for 0.4 MB of conversation after 12 questions with charts. The hand-written loop keeps one list.
-- **Harmless:** `"is_error": false` on successful chart results (the API's default), two user messages in a row merged into one (after the step cap or a dropped connection), a different key order in the request JSON, LangChain's own User-Agent and `X-Stainless-*` headers, one connection pool shared by all LangGraph agents in a process, and a connect timeout of 600 seconds instead of 5, so a hung connection waits longer before a retry.
+- **Harmless:** `"is_error": false` on successful chart results (the API's default), two user messages in a row merged into one (after the step cap), a different key order in the request JSON, LangChain's own User-Agent and `X-Stainless-*` headers, one connection pool shared by all LangGraph agents in a process, and a connect timeout of 600 seconds instead of 5, so a hung connection waits longer before a retry.
 
-## Found in both loops (not fixed)
+## Found in both loops
 
-Fixing these means changing agent.py, which this comparison left alone:
+The offline replay found four problems that both loops share. Fixing them meant changing agent.py, so they waited until the comparison was done: the results and line counts above are from before these fixes. Each fix has a test in [tests/test_loops_match.py](../tests/test_loops_match.py) that runs both loops on the same scripted stream.
 
-- A stream that ends before its `message_delta` event, so with no stop reason, is taken as a complete turn: its text becomes the answer, or its tool calls run.
-- A connection dropped mid-stream raises an error out of `ask` instead of returning one.
-- A turn run again because of unparseable tool input is billed but not counted in the token totals.
-- A fallback reported only in the usage details isn't noticed.
+- **Fixed: a stream that ends before its `message_delta` event.** With no stop reason, the turn was taken as complete: its text became the answer, or its tool calls ran. Now it's an error, and the question is rolled back.
+- **Fixed: a connection dropped mid-stream.** The SDK turns a lost connection into an `APIError` only before the response starts. Mid-stream, httpx2's own error went straight out of `ask`. Now `ask` catches it too (`httpx2.TransportError`), returns status "error" and rolls the question back. Both loops also now end the half-printed line when a turn fails, so they print the same: LangChain doesn't pass on the event that ends a block.
+- **Fixed in the hand-written loop only: a fallback named only in `usage.iterations`.** A fallback model that served the whole turn has no `fallback` block to mark it, so the turn was recorded under the model asked for. The hand-written loop now reads the model from `usage.iterations`. LangChain drops it, so the LangGraph loop can't (see Fallback models under [Where the loops still differ](#where-the-loops-still-differ)).
+- **Not fixed: a turn run again because of unparseable tool input is billed but not counted in the token totals.** The hand-written loop can't know what that turn cost: the SDK gives up at the bad input, before the `message_delta` event that carries the output token count. It has only the input counts, from `message_start`. Counting those would make the loops disagree: LangChain reads token counts only from `message_delta`, so the LangGraph loop has all of them for bad input (it reads the whole turn) and none for a stream that breaks partway, which both loops also run again.
+
+[cloud_agent.py](../cloud_agent.py), the public page's loop, had the first two problems as well and has the same fixes, tested in [tests/test_cloud_agent.py](../tests/test_cloud_agent.py). It has no retry for unparseable tool input.
 
 ## How the predictions scored
 

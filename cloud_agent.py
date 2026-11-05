@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 import anthropic
+import httpx2
 from dotenv import load_dotenv
 
 from agent import BETAS, DIM, MODEL, RED, RESET, Answer, StreamPrinter, has_credentials, profile, show_result, show_tool_call, silent, slug
@@ -171,7 +172,7 @@ class CloudAgent:
             del self.messages[start:]
             self.out(f"\n{DIM}[cancelled]{RESET}")
             answer.status = "cancelled"
-        except anthropic.APIError as exc:
+        except (anthropic.APIError, httpx2.TransportError, RuntimeError) as exc:  # the same errors as Agent.ask
             del self.messages[start:]
             self.out(f"\n{RED}Error: {exc}{RESET}")
             answer.status, answer.error = "error", f"{type(exc).__name__}: {exc}"
@@ -213,7 +214,10 @@ class CloudAgent:
                 if event.type == "content_block_stop":
                     self._show_block(event.content_block)
             printer.finish()
-            return stream.get_final_message()
+            response = stream.get_final_message()
+            if response.stop_reason is None:  # the stream ended before message_delta: the turn is incomplete
+                raise RuntimeError("The response ended before the message was complete.")
+            return response
 
     def _show_block(self, block) -> None:
         if block.type == "server_tool_use":
