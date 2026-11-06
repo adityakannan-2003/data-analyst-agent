@@ -22,7 +22,7 @@ import anthropic
 import httpx2
 from dotenv import load_dotenv
 
-from agent import BETAS, DIM, MODEL, RED, RESET, Answer, StreamPrinter, has_credentials, profile, show_result, show_tool_call, silent, slug
+from agent import BETAS, DIM, MODEL, RED, RESET, Answer, StreamPrinter, has_credentials, profile, served_by, show_result, show_tool_call, silent, slug
 from sandbox import comment_lines, read_data
 
 CODE_EXECUTION = {"type": "code_execution_20260521", "name": "code_execution"}
@@ -143,7 +143,7 @@ class CloudAgent:
             for _ in range(MAX_REQUESTS):
                 response = self._call_model()
                 answer.usage.add(response.usage)
-                answer.models.append(response.model)
+                answer.models.append(served_by(response))  # the page prices each question by this model
                 if response.container:
                     self.container = response.container.id
 

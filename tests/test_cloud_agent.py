@@ -65,8 +65,9 @@ class FakeClient:
         return FakeStream(turn)
 
 
-def response(*content, stop_reason="end_turn", container="container-1"):
-    usage = NS(input_tokens=10, output_tokens=5, cache_read_input_tokens=0, cache_creation_input_tokens=0)
+def response(*content, stop_reason="end_turn", container="container-1", iterations=None):
+    usage = NS(input_tokens=10, output_tokens=5, cache_read_input_tokens=0, cache_creation_input_tokens=0,
+               iterations=iterations)
     return NS(content=list(content), stop_reason=stop_reason, usage=usage, model=MODEL, container=NS(id=container))
 
 
@@ -183,6 +184,12 @@ def test_an_error_rolls_back_the_question(make_agent, failure, error):
 
     assert (answer.status, answer.text) == ("error", "") and error in answer.error
     assert agent.messages == []
+
+
+def test_a_fallback_named_only_in_usage_is_recorded(make_agent):
+    # The page prices each question by the model that served it, so a fallback must be recorded as itself.
+    turn = response(text("22."), iterations=[NS(type="fallback_message", model="claude-opus-5-5")])
+    assert make_agent([turn]).ask("What are total sales?").models == ["claude-opus-5-5"]
 
 
 def test_close_deletes_only_an_upload_the_agent_made(make_agent):

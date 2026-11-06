@@ -219,6 +219,13 @@ def slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:40] or "chart"
 
 
+def served_by(response) -> str:
+    """The model that served a turn. usage.iterations names a fallback model even when no fallback block marked
+    it, and then response.model is still the model asked for."""
+    served = [i.model for i in response.usage.iterations or [] if i.type == "fallback_message"]
+    return served[-1] if served else response.model
+
+
 class Agent:
     def __init__(
         self, csv_path: Path, out_dir: Path, model: str = MODEL, effort: str = "high", quiet: bool = False, on_event=None
@@ -246,9 +253,7 @@ class Agent:
             for _ in range(MAX_STEPS):
                 response = self._call_model()
                 answer.usage.add(response.usage)
-                # usage.iterations names a fallback model that served the turn, even when no fallback block marked it.
-                served = [i.model for i in response.usage.iterations or [] if i.type == "fallback_message"]
-                answer.models.append(served[-1] if served else response.model)
+                answer.models.append(served_by(response))
 
                 if response.stop_reason == "refusal":
                     del self.messages[start:]  # drop the declined question so later questions still work
