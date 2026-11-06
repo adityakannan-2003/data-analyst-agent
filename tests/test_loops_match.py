@@ -23,8 +23,9 @@ USAGE = {"input_tokens": 2, "cache_creation_input_tokens": 100, "cache_read_inpu
          "cache_creation": {"ephemeral_5m_input_tokens": 100, "ephemeral_1h_input_tokens": 0}, "output_tokens": 1}
 
 
-def stream(*blocks, stop="end_turn"):
-    """One streamed model turn. message_delta repeats the full token counts, as the API does."""
+def stream(*blocks, stop="end_turn", iterations=None):
+    """One streamed model turn. message_delta repeats the full token counts, as the API does, and can list the
+    turn's sampling iterations."""
     events = [{"type": "message_start", "message": {"id": "msg_1", "type": "message", "role": "assistant", "model": MODEL,
                                                     "content": [], "stop_reason": None, "stop_sequence": None,
                                                     "usage": USAGE}}]
@@ -33,6 +34,8 @@ def stream(*blocks, stop="end_turn"):
         events += [{"type": "content_block_delta", "index": i, "delta": delta} for delta in deltas]
         events.append({"type": "content_block_stop", "index": i})
     usage = {**{k: v for k, v in USAGE.items() if k != "cache_creation"}, "output_tokens": 50}
+    if iterations:
+        usage["iterations"] = iterations
     events += [{"type": "message_delta", "delta": {"stop_reason": stop, "stop_sequence": None}, "usage": usage},
                {"type": "message_stop"}]
     return "".join(f"event: {e['type']}\ndata: {json.dumps(e)}\n\n" for e in events).encode()
@@ -59,6 +62,25 @@ def broken(*blocks):
     good = stream(*blocks).decode()
     cut = good.index("event: content_block_start", good.index("content_block_stop"))
     return (good[:cut] + "event: content_block_delta\ndata: {not json\n\n").encode()
+
+
+def ended_early(*blocks):
+    """A stream that ends before its message_delta event, so the turn has no stop reason."""
+    good = stream(*blocks).decode()
+    return good[:good.index("event: message_delta")].encode()
+
+
+class Dropped:
+    """A response body cut off after its first block by a dropped connection: httpx2 raises the error while the
+    body is read, as it does for a real one. Each loop reads the body afresh."""
+
+    def __init__(self, *blocks):
+        good = stream(*blocks)
+        self.sent = good[:good.index(b"event: content_block_start", good.index(b"content_block_stop"))]
+
+    def __iter__(self):
+        yield self.sent
+        raise httpx2.RemoteProtocolError("peer closed connection without sending complete message body")
 
 
 OVERLOADED = (529, {"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}})
@@ -178,3 +200,49 @@ def test_refusals_errors_and_ctrl_c_roll_back_the_same(csv_path, monkeypatch):
     assert hand["answers"][1]["error"].startswith("OverloadedError: ")
     assert not (csv_path.parent / "ran").exists()
     assert hand["requests"][-1]["messages"] == [{"role": "user", "content": "Q4"}]
+
+
+def test_a_stream_that_ends_early_is_an_error(csv_path, monkeypatch):
+    ran = csv_path.parent / "ran"
+    responses = [
+        # 1. Text, then the stream ends before message_delta: it isn't the answer.
+        ended_early(text("The answer is")),
+        # 2. After a tool call, a turn whose stream ends early: its tool call doesn't run.
+        stream(tool("t1", "run_python", '{"code": "print(1)"}')),
+        ended_early(tool("t2", "run_python", json.dumps({"code": f"open({str(ran)!r}, 'w')"}))),
+        # 3. A normal answer, with neither question in its history.
+        stream(text("Fine.")),
+    ]
+    hand = both(csv_path, monkeypatch, responses, ["Q1", "Q2", "Q3"])
+
+    assert [a["status"] for a in hand["answers"]] == ["error", "error", "ok"]
+    assert hand["answers"][0]["error"] == "RuntimeError: The response ended before the message was complete."
+    assert hand["answers"][0]["text"] == ""
+    assert not ran.exists()
+    assert hand["requests"][-1]["messages"] == [{"role": "user", "content": "Q3"}]
+
+
+def test_a_dropped_connection_is_an_error(csv_path, monkeypatch):
+    responses = [
+        # 1. The connection drops partway through the question's second turn.
+        stream(tool("d1", "run_python", '{"code": "print(1)"}')),
+        Dropped(thinking("Checking."), text("Lost.")),
+        # 2. A normal answer, with none of the first question in its history.
+        stream(text("Fine.")),
+    ]
+    hand = both(csv_path, monkeypatch, responses, ["Q1", "Q2"])
+
+    assert [a["status"] for a in hand["answers"]] == ["error", "ok"]
+    assert hand["answers"][0]["error"].startswith("RemoteProtocolError: peer closed connection")
+    assert hand["requests"][-1]["messages"] == [{"role": "user", "content": "Q2"}]
+
+
+def test_a_fallback_named_only_in_usage_is_recorded(csv_path, monkeypatch):
+    # A fallback that served the whole turn has no fallback block marking it: only usage.iterations names it.
+    served = {**USAGE, "output_tokens": 50, "type": "fallback_message", "model": "claude-opus-5-5"}
+    responses = [stream(text("Fine."), iterations=[served])]
+    hand = run("hand-written", csv_path, monkeypatch, responses, ["Q1"])
+    graph = run("langgraph", csv_path, monkeypatch, responses, ["Q1"])
+
+    assert hand["answers"][0]["models"] == ["claude-opus-5-5"]
+    assert graph["answers"][0]["models"] == [MODEL]  # LangChain drops usage.iterations: see docs/LANGGRAPH.md

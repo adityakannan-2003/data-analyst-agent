@@ -38,7 +38,8 @@ class FakeClient:
 
 
 def turn(*content, stop_reason="end_turn"):
-    usage = NS(input_tokens=10, output_tokens=5, cache_read_input_tokens=0, cache_creation_input_tokens=0)
+    usage = NS(input_tokens=10, output_tokens=5, cache_read_input_tokens=0, cache_creation_input_tokens=0,
+               iterations=None)
     return NS(content=list(content), stop_reason=stop_reason, usage=usage, model=MODEL)
 
 
