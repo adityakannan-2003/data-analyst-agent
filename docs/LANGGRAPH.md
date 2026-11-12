@@ -114,7 +114,7 @@ The miss was the code. The loop and the graph alone are 92 lines, 39% more than 
 
 Written on 2026-11-04, before any paid run.
 
-The saved runs closest to today's setup are coffee [v2](../.claude/hillclimb/analyst-answers/v2/results.jsonl) and retail [baseline](../.claude/hillclimb/retail-answers/baseline/results.jsonl). Both used Sonnet 5.5, high effort, code run on this computer, and the hand-written loop. The predictions compare LangGraph with a re-run of the hand-written loop on the same day, not with these old runs.
+The saved runs closest to today's setup are coffee [v2](../evals/runs/analyst-answers/v2/results.jsonl) and retail [baseline](../evals/runs/retail-answers/baseline/results.jsonl). Both used Sonnet 5.5, high effort, code run on this computer, and the hand-written loop. The predictions compare LangGraph with a re-run of the hand-written loop on the same day, not with these old runs.
 
 | Per answer unless stated | Saved runs (Oct 10), coffee / retail | Noise: a smaller gap could be luck | Claude predicts | Ak predicts |
 |---|---|---|---|---|

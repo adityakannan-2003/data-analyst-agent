@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from pricing import cost  # noqa: E402
 
-FLOW = ROOT / ".claude" / "hillclimb"
+FLOW = ROOT / "evals" / "runs"
 # suite: (results folder, LangGraph variant, hand-written variant)
 SUITES = {"coffee": ("analyst-answers", "langgraph-v1", "v5"), "retail": ("retail-answers", "langgraph-v1", "v2")}
 LOOPS = ("LangGraph", "hand-written")

@@ -193,7 +193,7 @@ uv run python evals/run_eval.py --executor cloud --variant v4
 uv run python evals/run_eval.py --suite retail --executor cloud --variant v1
 ```
 
-It passed every question on both runs, 22 of 22 on the made-up data and 15 of 15 on the real data. It costs more and takes about twice as long: $0.039 and 21 seconds per answer on the coffee data, against $0.02 and 10 seconds locally. Most of the extra cost is input. The tokens written to the cache about double per answer (3,000 to 6,300 on the coffee data, 2,200 to 4,300 on the retail data), even on the retail data, where the number of steps didn't change. That points to the code execution tool's own instructions, which go with every request. On the coffee data the agent also takes more steps (3.5 against 2.6) and writes about 60% more, since Python variables don't carry over between commands in the sandbox. Every answer and grade is in [results.jsonl](.claude/hillclimb/analyst-answers/v4/results.jsonl) and [the retail results](.claude/hillclimb/retail-answers/v1/results.jsonl).
+It passed every question on both runs, 22 of 22 on the made-up data and 15 of 15 on the real data. It costs more and takes about twice as long: $0.039 and 21 seconds per answer on the coffee data, against $0.02 and 10 seconds locally. Most of the extra cost is input. The tokens written to the cache about double per answer (3,000 to 6,300 on the coffee data, 2,200 to 4,300 on the retail data), even on the retail data, where the number of steps didn't change. That points to the code execution tool's own instructions, which go with every request. On the coffee data the agent also takes more steps (3.5 against 2.6) and writes about 60% more, since Python variables don't carry over between commands in the sandbox. Every answer and grade is in [results.jsonl](evals/runs/analyst-answers/v4/results.jsonl) and [the retail results](evals/runs/retail-answers/v1/results.jsonl).
 
 The page records every question: what was asked, the answer, the code the agent ran, the cost, the time taken, and the visitor's thumbs up or down. For uploaded files, what the code printed isn't kept. `scripts/usage_report.py` summarizes the log, and picks a random sample of live answers to grade by hand, since live questions have no answer key.
 
@@ -228,7 +228,7 @@ The tests check the code; the evals check the answers. There are two, called sui
 
 Each question has checks with expected values that [evals/answer_key.py](evals/answer_key.py) computes from the data. Claude Sonnet 5.5 grades each answer against its checks, and a question passes only if every check does.
 
-**Baseline: all 17 original questions pass on both runs** with `claude-opus-5-5` at high effort (95% interval: 82% to 100%). An answer costs about $0.05 and takes about 16 seconds. Every answer and grade is in [results.jsonl](.claude/hillclimb/analyst-answers/baseline/results.jsonl). With a perfect baseline, the eval's main use is catching regressions, for example when trying a cheaper model or lower effort.
+**Baseline: all 17 original questions pass on both runs** with `claude-opus-5-5` at high effort (95% interval: 82% to 100%). An answer costs about $0.05 and takes about 16 seconds. Every answer and grade is in [results.jsonl](evals/runs/analyst-answers/baseline/results.jsonl). With a perfect baseline, the eval's main use is catching regressions, for example when trying a cheaper model or lower effort.
 
 **Opus 5.5 vs. Sonnet 5.5** on the original 17 questions, with the same tools, effort and grader:
 
@@ -238,7 +238,7 @@ Each question has checks with expected values that [evals/answer_key.py](evals/a
 | Matcha average question | 2 of 2 | 1 of 6 | 6 of 6 | 2 of 2 |
 | Cost per answer | $0.047 | $0.020 | $0.021 | $0.049 |
 | Time per answer | 16 s | 11 s | 10 s | 17 s |
-| Results | [baseline](.claude/hillclimb/analyst-answers/baseline/results.jsonl) | [v1](.claude/hillclimb/analyst-answers/v1/results.jsonl) | [v2](.claude/hillclimb/analyst-answers/v2/results.jsonl) | [v3](.claude/hillclimb/analyst-answers/v3/results.jsonl) |
+| Results | [baseline](evals/runs/analyst-answers/baseline/results.jsonl) | [v1](evals/runs/analyst-answers/v1/results.jsonl) | [v2](evals/runs/analyst-answers/v2/results.jsonl) | [v3](evals/runs/analyst-answers/v3/results.jsonl) |
 
 On the original prompt, Sonnet missed only the Matcha Latte average, which it passed in 1 of 6 runs. It either averaged over all 12 months without noting the March launch, or noticed the launch and got the figure wrong ($1,031 instead of $1,238). One line in the system prompt fixed that: when averaging over time, check that everything was around for the whole period. With it, Sonnet passes every question at under half the cost of Opus, and Opus still passes everything. I wrote the line after seeing the failure, and only the Matcha question tests it, so this shows the fix works. It doesn't show that the fix generalizes.
 
@@ -277,7 +277,7 @@ That runs every question twice on the default model: about $1.05 with Sonnet, in
 
 Real data has no planted answers, and some questions have more than one fair answer. "Revenue" can be before or after cancellations, and a "product" can be a name or a stock code. So where a fair choice changes the answer, the check accepts each fair reading, as long as the answer says which one it used.
 
-**Result: all 15 questions pass on both runs** with Sonnet 5.5, at $0.017 and 9 seconds per answer. Every answer and grade is in [results.jsonl](.claude/hillclimb/retail-answers/baseline/results.jsonl).
+**Result: all 15 questions pass on both runs** with Sonnet 5.5, at $0.017 and 9 seconds per answer. Every answer and grade is in [results.jsonl](evals/runs/retail-answers/baseline/results.jsonl).
 
 ```bash
 uv run python evals/run_eval.py --suite retail

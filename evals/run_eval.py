@@ -11,7 +11,7 @@ with expected values from evals/answer_key.py. "retail" asks evals/retail_cases.
 UCI Online Retail data, with expected values from evals/retail_key.py. A second model (the judge)
 grades each answer against the case's checks, and a case passes when every check does.
 
-Output goes to .claude/hillclimb/<suite folder>/<variant>/:
+Output goes to evals/runs/<suite folder>/<variant>/:
   results.jsonl              one graded row per (case, run), written as each finishes
   traces/<case>_rep<k>.json  the full conversation, to see why a case passed or failed
   errors.jsonl               runs that never produced an answer (API errors, timeouts); not scored
@@ -75,7 +75,7 @@ def use_suite(name: str) -> None:
     """Point the module at one suite's data, questions, answer key and results folder."""
     global CSV, CASES, KEY, FLOW
     data, cases, key, flow = SUITES[name]
-    CSV, CASES, FLOW = ROOT / "data" / data, ROOT / "evals" / cases, ROOT / ".claude" / "hillclimb" / flow
+    CSV, CASES, FLOW = ROOT / "data" / data, ROOT / "evals" / cases, ROOT / "evals" / "runs" / flow
     KEY = importlib.import_module(key)
     if not CSV.exists():
         fetch = " Get it with: uv run python scripts/fetch_online_retail.py" if name == "retail" else ""
